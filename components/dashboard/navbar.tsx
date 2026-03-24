@@ -71,7 +71,7 @@ export function Navbar() {
           <Link href="../explorar">
             <Button variant="ghost" size="sm" className={`hidden gap-2 md:flex ${isActive('/explorar') ? 'bg-violet-500/20 text-violet-400' : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400'}`}>
               <Compass className="h-4 w-4" />
-              <span>Explorar</span>
+              <span>ver</span>
             </Button>
           </Link>
 

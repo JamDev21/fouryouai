@@ -1,41 +1,120 @@
 "use client";
-import { poblarBaseDeDatos } from '../src/lib/seedDB';
-import { Navbar } from "@/components/dashboard/navbar"
-import { ContentFeed } from "@/components/dashboard/content-feed"
-import { TrendingTopics } from "@/components/dashboard/trending-topics"
-import { Suggestions } from "@/components/dashboard/suggestions"
+import { useState } from "react";
+import { Navbar } from "@/components/dashboard/navbar";
+import { useRouter } from "next/navigation";
+import { UserPlus, Tag as TagIcon, Upload } from "lucide-react"; // Usando lucide-react para los iconos
 
-export default function Dashboard() {
+export default function SubirContenidoPage() {
+  const router = useRouter();
+  
+  // Estados del formulario
+  const [form, setForm] = useState({
+    titulo: "",
+    descripcion: "",
+    tipo: "",
+    etiquetas: "",
+  });
+
+  // Validación de Criterios de Aceptación
+  const isInvalid = !form.titulo || !form.tipo || !form.etiquetas;
+
+  const handleGuardar = () => {
+    // Aquí conectarás con la colección 'contenidos'
+    console.log("Guardando en contenidos...", form);
+    alert("¡Contenido publicado con éxito!"); 
+    router.push("/");
+  };
+
   return (
-    <>
-      <div className="min-h-screen bg-[#0a0a0f]"> {/* Añadí pt-12 para que la barra no tape el Navbar */}
-        {/* Gradient Background Effects */}
-        <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-violet-600/20 blur-[100px]" />
-          <div className="absolute -right-40 top-1/4 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
-          <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-violet-500/10 blur-[100px]" />
+    <div className="min-h-screen bg-[#0a0a0f] text-gray-200">
+      <Navbar />
+
+      <main className="mx-auto max-w-3xl px-4 py-12">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white">Aportar recursos</h1>
+          <p className="text-gray-400">Comparte conocimiento con la comunidad de Fouryou.ai</p>
         </div>
 
-        {/* Main Content */}
-        <div className="relative">
-          <Navbar />
+        <div className="space-y-6 rounded-2xl border border-white/5 bg-[#11111a] p-8 shadow-xl">
+          
+          {/* Título */}
+          <div>
+            <label className="mb-2 block text-sm font-medium">Título del recurso</label>
+            <input 
+              type="text"
+              className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
+              placeholder="Ej: Pentesting con Metasploit"
+              onChange={(e) => setForm({...form, titulo: e.target.value})}
+            />
+          </div>
 
-          <main className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
-            <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-              {/* Main Feed - Left Column (70%) [cite: 40, 60] */}
-              <section>
-                <ContentFeed />
-              </section>
+          {/* Descripción Corta */}
+          <div>
+            <label className="mb-2 block text-sm font-medium">Descripción corta</label>
+            <textarea 
+              className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
+              rows={3}
+              placeholder="¿De qué trata este recurso?"
+              onChange={(e) => setForm({...form, descripcion: e.target.value})}
+            />
+          </div>
 
-              {/* Sidebar - Right Column (30%) [cite: 61, 83] */}
-              <aside className="space-y-6">
-                <TrendingTopics />
-                <Suggestions />
-              </aside>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Tipo */}
+            <div>
+              <label className="mb-2 block text-sm font-medium">Tipo de contenido</label>
+              <select 
+                className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
+                onChange={(e) => setForm({...form, tipo: e.target.value})}
+              >
+                <option value="">Seleccionar...</option>
+                <option value="video">Video</option>
+                <option value="articulo">Artículo</option>
+              </select>
             </div>
-          </main>
+
+            {/* Etiquetas */}
+            <div>
+              <label className="mb-2 block text-sm font-medium">Etiquetas</label>
+              <input 
+                type="text"
+                className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
+                placeholder="Ciberseguridad, React..."
+                onChange={(e) => setForm({...form, etiquetas: e.target.value})}
+              />
+            </div>
+          </div>
+
+          {/* Iconos Decorativos (Criterio de Aceptación) */}
+          <div className="flex gap-4 py-2">
+            <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-purple-400 transition">
+              <TagIcon size={18} /> Etiquetar persona
+            </button>
+            <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-purple-400 transition">
+              <UserPlus size={18} /> Invitar colaborador
+            </button>
+          </div>
+
+          {/* Placeholder para Cloudinary */}
+          <div className="rounded-lg border-2 border-dashed border-white/10 bg-black/20 p-10 text-center">
+            <Upload className="mx-auto mb-2 text-gray-500" size={32} />
+            <p className="text-sm text-gray-400">Aquí se integrará el widget de Cloudinary</p>
+          </div>
+
+          {/* Botón de Acción */}
+          <button
+            onClick={handleGuardar}
+            disabled={isInvalid}
+            className={`w-full rounded-xl py-4 font-bold text-white transition-all ${
+              isInvalid 
+                ? "cursor-not-allowed bg-gray-800 opacity-50" 
+                : "bg-gradient-to-r from-purple-600 to-violet-600 shadow-lg shadow-purple-500/20 hover:scale-[1.02]"
+            }`}
+          >
+            Publicar Contenido
+          </button>
         </div>
-      </div>
-    </>
-  )
+      </main>
+    </div>
+  );
 }

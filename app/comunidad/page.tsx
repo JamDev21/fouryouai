@@ -1,41 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-// Ruta directa al archivo de Firebase en src/lib
+import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { db } from "../../src/lib/firebaseConfig"; 
 import ThreadCard from "../../components/ThreadCard";
+import type { Thread } from "../../types/foro";
 import { MessageSquarePlus, Sparkles, Clock, TrendingUp, HelpCircle } from "lucide-react";
 
-export interface Thread {
-  id: string;
-  titulo: string;
-  autor: {
-    nombre: string;
-    avatarUrl: string;
-  };
-  tags: string[];
-  fecha: { seconds: number };
-  respuestasCount: number;
-}
+type Tab = "recientes" | "populares" | "sin-responder";
 
-type FilterTab = "recientes" | "populares" | "sin-responder";
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "recientes",     label: "Recientes",     icon: <Clock size={12} /> },
+  { id: "populares",     label: "Populares",     icon: <TrendingUp size={12} /> },
+  { id: "sin-responder", label: "Sin responder", icon: <HelpCircle size={12} /> },
+];
 
 export default function ComunidadPage() {
   const [hilos, setHilos] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<FilterTab>("recientes");
+  const [tab, setTab] = useState<Tab>("recientes");
 
   useEffect(() => {
-    // Conexión real con la colección de Jona
     const q = query(collection(db, "foros_hilos"), orderBy("fecha", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data: Thread[] = snapshot.docs.map((doc) => ({
+      const dbData: Thread[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...(doc.data() as Omit<Thread, "id">),
       }));
-      setHilos(data);
+
+      if (dbData.length === 0) {
+        setHilos([
+          {
+            id: "demo-1",
+            titulo: "¡Diseño de comunidad de Cesar terminado! 🚀",
+            autor: { nombre: "Cesar Pacheco", avatarUrl: "" },
+            tags: ["ingenieria", "react"],
+            fecha: Timestamp.now(),
+            respuestasCount: 12
+          }
+        ]);
+      } else {
+        setHilos(dbData);
+      }
       setLoading(false);
     });
 
@@ -43,63 +50,50 @@ export default function ComunidadPage() {
   }, []);
 
   const hilosFiltrados = hilos.filter((h) => {
-    if (tab === "populares") return h.respuestasCount > 5;
-    if (tab === "sin-responder") return h.respuestasCount === 0;
+    if (tab === "populares") return (h.respuestasCount ?? 0) > 5;
+    if (tab === "sin-responder") return (h.respuestasCount ?? 0) === 0;
     return true;
   });
 
-  const tabs: { id: FilterTab; label: string; icon: React.ReactNode }[] = [
-    { id: "recientes", label: "Recientes", icon: <Clock size={13} /> },
-    { id: "populares", label: "Populares", icon: <TrendingUp size={13} /> },
-    { id: "sin-responder", label: "Sin responder", icon: <HelpCircle size={13} /> },
-  ];
-
   return (
-    <main className="min-h-screen text-white bg-[#0B0B0F]" style={{ fontFamily: "sans-serif" }}>
-      <div className="sticky top-0 z-20 bg-[#0B0B0F]/80 backdrop-blur-md border-b border-white/5">
+    <main className="min-h-screen text-white bg-[#0B0B0F]">
+      <div className="sticky top-0 z-20" style={{ background: "rgba(11,11,15,0.88)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Comunidad</h1>
-            <p className="text-[10px] text-white/30 uppercase tracking-widest">Live Updates</p>
+            <h1 className="text-xl font-bold text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Comunidad</h1>
+            <p className="text-xs text-white/35 mt-0.5">Discusiones académicas · tiempo real</p>
           </div>
-          <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-            <MessageSquarePlus size={16} />
+          <button className="flex items-center gap-2 text-white text-sm font-medium rounded-xl px-4 py-2 bg-purple-600 hover:bg-purple-500 transition-colors duration-150">
+            <MessageSquarePlus size={15} />
             Nuevo hilo
           </button>
         </div>
 
         <div className="max-w-3xl mx-auto px-6 pb-3 flex gap-2">
-          {tabs.map((t) => (
+          {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border ${
-                tab === t.id ? "bg-purple-500/10 border-purple-500/40 text-purple-400" : "border-white/5 text-white/40"
-              }`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all duration-150"
+              style={
+                tab === t.id
+                  ? { background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.45)", color: "#a78bfa" }
+                  : { border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }
+              }
             >
-              {t.icon} {t.label}
+              {t.icon}
+              {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        {loading ? (
-          <div className="flex flex-col gap-4 animate-pulse">
-            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-white/5 rounded-2xl" />)}
-          </div>
-        ) : hilosFiltrados.length === 0 ? (
-          <div className="flex flex-col items-center py-20 opacity-40">
-            <Sparkles size={40} className="mb-4" />
-            <p>Aún no hay discusiones aquí.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {hilosFiltrados.map((hilo) => (
-              <ThreadCard key={hilo.id} thread={hilo} />
-            ))}
-          </div>
-        )}
+      <div className="max-w-3xl mx-auto px-6 py-6">
+        <div className="flex flex-col gap-3">
+          {hilosFiltrados.map((hilo) => (
+            <ThreadCard key={hilo.id} thread={hilo} />
+          ))}
+        </div>
       </div>
     </main>
   );

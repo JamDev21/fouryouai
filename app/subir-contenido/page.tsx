@@ -2,25 +2,34 @@
 import { useState } from "react";
 import { Navbar } from "@/components/dashboard/navbar";
 import { useRouter } from "next/navigation";
-import { UserPlus, Tag as TagIcon, Upload } from "lucide-react"; // Usando lucide-react para los iconos
+import { UserPlus, Tag as TagIcon, Upload } from "lucide-react"; 
+
+import { MediaUpload } from "@/components/dashboard/media-upload";
 
 export default function SubirContenidoPage() {
   const router = useRouter();
   
-  // Estados del formulario
+  // 1. Estados del formulario (Añadimos mediaUrl para guardar el link de Cloudinary)
   const [form, setForm] = useState({
     titulo: "",
     descripcion: "",
     tipo: "",
     etiquetas: "",
   });
+  const [mediaUrl, setMediaUrl] = useState("");
 
-  // Validación de Criterios de Aceptación
-  const isInvalid = !form.titulo || !form.tipo || !form.etiquetas;
+  // 2. Validación: Ahora exige que mediaUrl NO esté vacío
+  const isInvalid = !form.titulo || !form.tipo || !form.etiquetas || !mediaUrl;
 
   const handleGuardar = () => {
-    // Aquí conectarás con la colección 'contenidos'
-    console.log("Guardando en contenidos...", form);
+    // 3. Agregamos la URL al objeto final antes de enviarlo a la base de datos
+    const contenidoFinal = {
+      ...form,
+      urlMedia: mediaUrl,
+      fechaCreacion: new Date()
+    };
+    
+    console.log("Guardando en contenidos...", contenidoFinal);
     alert("¡Contenido publicado con éxito!"); 
     router.push("/");
   };
@@ -85,7 +94,7 @@ export default function SubirContenidoPage() {
             </div>
           </div>
 
-          {/* Iconos Decorativos (Criterio de Aceptación) */}
+          {/* Iconos Decorativos */}
           <div className="flex gap-4 py-2">
             <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-purple-400 transition">
               <TagIcon size={18} /> Etiquetar persona
@@ -95,10 +104,30 @@ export default function SubirContenidoPage() {
             </button>
           </div>
 
-          {/* Placeholder para Cloudinary */}
-          <div className="rounded-lg border-2 border-dashed border-white/10 bg-black/20 p-10 text-center">
-            <Upload className="mx-auto mb-2 text-gray-500" size={32} />
-            <p className="text-sm text-gray-400">Aquí se integrará el widget de Cloudinary</p>
+          {/* ========================================= */}
+          {/* REEMPLAZO DEL PLACEHOLDER POR CLOUDINARY  */}
+          {/* ========================================= */}
+          <div className="pt-2">
+            <label className="mb-2 block text-sm font-medium text-white">
+              {form.tipo === "video" ? "Sube tu Video (MP4)" : "Sube una Portada (JPG/PNG)"}
+            </label>
+
+            {form.tipo === "" ? (
+              <div className="rounded-xl border-2 border-dashed border-gray-800 bg-[#0a0a0f]/50 p-10 text-center text-sm text-gray-500">
+                ⚠️ Primero selecciona el "Tipo de contenido" arriba.
+              </div>
+            ) : mediaUrl ? (
+              <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-6 text-center">
+                <span className="text-green-400 font-medium">
+                  ✅ Archivo subido a Cloudinary correctamente
+                </span>
+              </div>
+            ) : (
+              <MediaUpload 
+                type={form.tipo === "video" ? "video" : "image"} 
+                onUploadSuccess={(url) => setMediaUrl(url)} 
+              />
+            )}
           </div>
 
           {/* Botón de Acción */}

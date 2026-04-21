@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { db } from "../../src/lib/firebaseConfig"; 
 import ThreadCard from "../../components/ThreadCard";
+import NotificationBell from "../../components/NotificationBell"; // <-- Aquí importamos la campana
 import type { Thread } from "../../types/foro";
 import { MessageSquarePlus, Sparkles, Clock, TrendingUp, HelpCircle } from "lucide-react";
 
@@ -63,10 +64,16 @@ export default function ComunidadPage() {
             <h1 className="text-xl font-bold text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Comunidad</h1>
             <p className="text-xs text-white/35 mt-0.5">Discusiones académicas · tiempo real</p>
           </div>
-          <button className="flex items-center gap-2 text-white text-sm font-medium rounded-xl px-4 py-2 bg-purple-600 hover:bg-purple-500 transition-colors duration-150">
-            <MessageSquarePlus size={15} />
-            Nuevo hilo
-          </button>
+          
+          {/* ── AQUÍ METIMOS LA CAMPANA JUNTO AL BOTÓN ── */}
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <button className="flex items-center gap-2 text-white text-sm font-medium rounded-xl px-4 py-2 bg-purple-600 hover:bg-purple-500 transition-colors duration-150">
+              <MessageSquarePlus size={15} />
+              Nuevo hilo
+            </button>
+          </div>
+
         </div>
 
         <div className="max-w-3xl mx-auto px-6 pb-3 flex gap-2">

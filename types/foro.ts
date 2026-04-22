@@ -8,8 +8,17 @@ export interface Autor {
 export interface Thread {
   id: string;
   titulo: string;
-  autor: Autor;
+  descripcion: string;
+  categoria: string;
+  id_autor: string; 
   tags: string[];
-  fecha: Timestamp;
-  respuestasCount: number;
+  fechaCreacion: Timestamp; 
+  contadorRespuestas: number;
+}
+
+export interface NuevoHiloForm {
+  titulo: string;
+  descripcion: string;
+  categoria: string;
+  tags: string[];
 }

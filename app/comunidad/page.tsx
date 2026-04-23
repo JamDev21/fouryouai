@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-// RUTA EXACTA A TU FIREBASE DESDE ESTA PÁGINA:
-import { db, auth } from "../../src/lib/firebaseConfig"; 
-// RUTAS A TUS COMPONENTES Y TIPOS:
+
+import { db, auth } from "../../src/lib/firebaseConfig";
+ 
+// COMPONENTES Y TIPOS:
 import ThreadCard from "../../components/ThreadCard";
 import NuevoHiloModal from "../../components/NuevoHiloModal";
 import type { Thread } from "../../types/foro";
@@ -95,7 +96,10 @@ export default function ComunidadPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {hilosFiltrados.map((hilo) => (
-              <ThreadCard key={hilo.id} thread={hilo} />
+              <ThreadCard
+                 key={hilo.id}
+                 thread={hilo}
+               />
             ))}
           </div>
         )}

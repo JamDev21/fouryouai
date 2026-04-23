@@ -43,9 +43,9 @@ export default function ThreadCard({ thread }: Props) {
     router.push(`/comunidad/${thread.id}`);
   }
 
-  // --- NUEVA FUNCIÓN PARA ELIMINAR ---
+
   async function handleEliminar(e: React.MouseEvent) {
-    e.stopPropagation(); // Evita que al dar clic te meta al hilo
+    e.stopPropagation(); 
     
     if (window.confirm("¿Estás seguro de que quieres eliminar este hilo? Esta acción no se puede deshacer.")) {
       try {
@@ -172,7 +172,7 @@ export default function ThreadCard({ thread }: Props) {
                 Editar
               </button>
 
-              {/* Botón Eliminar (Solo si no tiene respuestas) */}
+              { }
               {(thread.contadorRespuestas === 0 || thread.contadorRespuestas === undefined) && (
                 <button
                   onClick={handleEliminar}

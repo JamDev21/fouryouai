@@ -2,10 +2,10 @@
 
 import { useRef, useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-// RUTA EXACTA A TU FIREBASE:
+
 import { db } from "../src/lib/firebaseConfig"; 
 import { X, Plus, Loader2, Hash, AlignLeft, Tag, Layers } from "lucide-react";
-// RUTAS EXACTAS A TUS HOOKS Y TYPES:
+
 import { useClickOutside } from "../hooks/useClickOutside";
 import type { NuevoHiloForm } from "../types/foro";
 

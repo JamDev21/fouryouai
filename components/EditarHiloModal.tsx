@@ -2,11 +2,22 @@
 
 import { useRef, useState, useEffect } from "react";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-// Rutas corregidas hacia tu carpeta src
-import { db } from "../src/lib/firebaseConfig";
-import { X, Plus, Loader2, Hash, AlignLeft, Tag } from "lucide-react";
+// Asegúrate de que esta ruta esté bien en tu proyecto:
+import { db } from "../src/lib/firebaseConfig"; 
+import { X, Plus, Loader2, Hash, AlignLeft, Tag, Layers } from "lucide-react";
 import { useClickOutside } from "../hooks/useClickOutside";
 import type { Thread } from "../types/foro";
+
+const CATEGORIAS = [
+  "Machine Learning",
+  "Desarrollo Web",
+  "Ciberseguridad",
+  "Ciencia de Datos",
+  "Inteligencia Artificial",
+  "Diseño UI/UX",
+  "DevOps",
+  "Otro",
+];
 
 interface Props {
   hilo: Thread;
@@ -17,6 +28,7 @@ interface Props {
 export default function EditarHiloModal({ hilo, open, onClose }: Props) {
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,6 +42,7 @@ export default function EditarHiloModal({ hilo, open, onClose }: Props) {
     if (open) {
       setTitulo(hilo.titulo ?? "");
       setDescripcion(hilo.descripcion ?? "");
+      setCategoria(hilo.categoria ?? ""); // ← Carga la categoría existente
       setTags(hilo.tags ?? []);
       setTagInput("");
       setError(null);
@@ -83,6 +96,7 @@ export default function EditarHiloModal({ hilo, open, onClose }: Props) {
     if (titulo.trim().length < 10) return "El título debe tener al menos 10 caracteres.";
     if (!descripcion.trim()) return "La descripción es obligatoria.";
     if (descripcion.trim().length < 20) return "La descripción debe tener al menos 20 caracteres.";
+    if (!categoria) return "Debes seleccionar una categoría.";
     return null;
   }
 
@@ -95,12 +109,12 @@ export default function EditarHiloModal({ hilo, open, onClose }: Props) {
     setError(null);
 
     try {
-      // Actualiza SOLO el documento del hilo en Firestore
+      // Actualiza SOLO el documento del hilo en Firestore, incluyendo la categoría
       await updateDoc(doc(db, "foros_hilos", hilo.id), {
         titulo:      titulo.trim(),
         descripcion: descripcion.trim(),
+        categoria:   categoria, // ← Guarda el cambio en Firebase
         tags,
-        // Opcional: guarda cuándo fue editado por última vez
         fechaEdicion: serverTimestamp(),
       });
 
@@ -235,6 +249,43 @@ export default function EditarHiloModal({ hilo, open, onClose }: Props) {
             >
               {descripcion.length}/1000
             </p>
+          </div>
+
+          {/* Categoría */}
+          <div className="flex flex-col gap-1.5">
+            <label
+              className="flex items-center gap-1.5 text-xs font-medium"
+              style={{ color: "rgba(255,255,255,0.45)" }}
+            >
+              <Layers size={12} />
+              Categoría <span style={{ color: "#a78bfa" }}>*</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIAS.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setCategoria(cat)}
+                  className="px-3 py-1.5 rounded-full text-xs transition-all duration-150"
+                  style={
+                    categoria === cat
+                      ? {
+                          background: "rgba(124,58,237,0.25)",
+                          border: "1px solid rgba(124,58,237,0.6)",
+                          color: "#c4b5fd",
+                        }
+                      : {
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          color: "rgba(255,255,255,0.4)",
+                        }
+                  }
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tags */}

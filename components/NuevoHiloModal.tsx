@@ -84,14 +84,14 @@ export default function NuevoHiloModal({
 
     try {
       await addDoc(collection(db, "foros_hilos"), {
-        titulo:             form.titulo.trim(),
-        descripcion:        form.descripcion.trim(),
-        categoria:          form.categoria,
-        tags:               form.tags,
+        titulo: form.titulo.trim(),
+        descripcion: form.descripcion.trim(),
+        categoria: form.categoria,
+        tags: form.tags,
         contadorRespuestas: 0,
-        fechaCreacion:      serverTimestamp(),
-        id_autor:           autorNombre,
-        id_hilo:            "", 
+        fechaCreacion: serverTimestamp(),
+        id_autor: autorNombre,
+        id_hilo: "", 
       });
 
       setSuccess(true);

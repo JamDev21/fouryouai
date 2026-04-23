@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, deleteDoc } from "firebase/firestore";
-import { db } from "../src/lib/firebaseConfig"; // Revisa que esta ruta sea correcta para ti
+import { db } from "../src/lib/firebaseConfig";
 import { MessageCircle, Calendar, Pencil, Trash2 } from "lucide-react";
 import EditarHiloModal from "./EditarHiloModal";
 import type { Thread } from "../types/foro";
@@ -26,7 +26,6 @@ export default function ThreadCard({ thread }: Props) {
     return () => unsubscribe();
   }, []);
 
-  // Comprueba si tú eres el autor para mostrar los botones
   const esMio = userName !== null && userName === thread.id_autor;
 
   const fecha = thread.fechaCreacion?.toDate().toLocaleDateString("es-MX", {
@@ -42,7 +41,6 @@ export default function ThreadCard({ thread }: Props) {
   function handleCardClick() {
     router.push(`/comunidad/${thread.id}`);
   }
-
 
   async function handleEliminar(e: React.MouseEvent) {
     e.stopPropagation(); 
@@ -144,10 +142,8 @@ export default function ThreadCard({ thread }: Props) {
             {thread.contadorRespuestas ?? 0} resp.
           </span>
 
-          {/* BOTONES DE EDITAR Y ELIMINAR */}
           {esMio && (
             <div className="flex gap-2 mt-1">
-              {/* Botón Editar */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -172,7 +168,6 @@ export default function ThreadCard({ thread }: Props) {
                 Editar
               </button>
 
-              { }
               {(thread.contadorRespuestas === 0 || thread.contadorRespuestas === undefined) && (
                 <button
                   onClick={handleEliminar}

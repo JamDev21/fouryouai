@@ -6,7 +6,9 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, deleteDoc } from "firebase/firestore";
 import { db } from "../src/lib/firebaseConfig";
 import { MessageCircle, Calendar, Pencil, Trash2 } from "lucide-react";
+import { useToast } from "../hooks/use-toast";
 import EditarHiloModal from "./EditarHiloModal";
+import EliminarHiloModal from "./EliminarHiloModal";
 import type { Thread } from "../types/foro";
 
 interface Props {
@@ -15,54 +17,76 @@ interface Props {
 
 export default function ThreadCard({ thread }: Props) {
   const router = useRouter();
+  const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUserName(user ? user.displayName : "Cesar Pacheco");
+      setUserName(user ? user.displayName : "Usuario");
     });
     return () => unsubscribe();
   }, []);
 
   const esMio = userName !== null && userName === thread.id_autor;
 
-  const fecha = thread.fechaCreacion?.toDate().toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }) ?? "Reciente";
+  const fecha =
+    thread.fechaCreacion?.toDate().toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }) ?? "Reciente";
 
   const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-    thread.id_autor ?? "?"
+    thread.id_autor ?? "?",
   )}&backgroundColor=7c3aed&fontSize=38&fontWeight=600&textColor=ffffff`;
 
   function handleCardClick() {
     router.push(`/comunidad/${thread.id}`);
   }
 
-  async function handleEliminar(e: React.MouseEvent) {
-    e.stopPropagation(); 
-    
-    if (window.confirm("¿Estás seguro de que quieres eliminar este hilo? Esta acción no se puede deshacer.")) {
-      try {
-        await deleteDoc(doc(db, "foros_hilos", thread.id));
-      } catch (error) {
-        console.error("Error al eliminar el hilo:", error);
-        alert("Hubo un error al intentar eliminar el hilo.");
-      }
+  function handleOpenDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    setDeleteOpen(true);
+  }
+
+  async function handleConfirmEliminar() {
+    try {
+      await deleteDoc(doc(db, "foros_hilos", thread.id));
+      setDeleteOpen(false);
+
+      toast({
+        title: "Hilo eliminado",
+        description: "El contenido se ha borrado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error al eliminar el hilo:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el hilo. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
     }
   }
 
   return (
     <>
       {esMio && (
-        <EditarHiloModal
-          hilo={thread}
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-        />
+        <>
+          <EditarHiloModal
+            hilo={thread}
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+          />
+
+          <EliminarHiloModal
+            isOpen={deleteOpen}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={handleConfirmEliminar}
+          />
+        </>
       )}
 
       <article
@@ -157,20 +181,23 @@ export default function ThreadCard({ thread }: Props) {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(124,58,237,0.2)";
-                  e.currentTarget.style.border = "1px solid rgba(124,58,237,0.5)";
+                  e.currentTarget.style.border =
+                    "1px solid rgba(124,58,237,0.5)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "rgba(124,58,237,0.1)";
-                  e.currentTarget.style.border = "1px solid rgba(124,58,237,0.25)";
+                  e.currentTarget.style.border =
+                    "1px solid rgba(124,58,237,0.25)";
                 }}
               >
                 <Pencil size={10} />
                 Editar
               </button>
 
-              {(thread.contadorRespuestas === 0 || thread.contadorRespuestas === undefined) && (
+              {(thread.contadorRespuestas === 0 ||
+                thread.contadorRespuestas === undefined) && (
                 <button
-                  onClick={handleEliminar}
+                  onClick={handleOpenDelete}
                   className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-all"
                   style={{
                     background: "rgba(239,68,68,0.1)",
@@ -179,11 +206,13 @@ export default function ThreadCard({ thread }: Props) {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(239,68,68,0.2)";
-                    e.currentTarget.style.border = "1px solid rgba(239,68,68,0.5)";
+                    e.currentTarget.style.border =
+                      "1px solid rgba(239,68,68,0.5)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "rgba(239,68,68,0.1)";
-                    e.currentTarget.style.border = "1px solid rgba(239,68,68,0.25)";
+                    e.currentTarget.style.border =
+                      "1px solid rgba(239,68,68,0.25)";
                   }}
                 >
                   <Trash2 size={10} />

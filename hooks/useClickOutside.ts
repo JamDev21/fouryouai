@@ -1,19 +1,18 @@
-// hooks/useClickOutside.ts
 import { useEffect, RefObject } from "react";
 
-export function useClickOutside<T extends HTMLElement>(
-  ref: RefObject<T | null>, // <-- Aquí aceptamos que sea null
-  callback: () => void
-) {
+export function useClickOutside(ref: RefObject<any>, handler: () => void) {
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      // Solo ejecutamos si el elemento existe
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        callback();
+    const listener = (event: MouseEvent | TouchEvent) => {
+      if (!ref.current || ref.current.contains(event.target as Node)) {
+        return;
       }
-    }
-
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [ref, callback]);
+      handler();
+    };
+    document.addEventListener("mousedown", listener);
+    document.addEventListener("touchstart", listener);
+    return () => {
+      document.removeEventListener("mousedown", listener);
+      document.removeEventListener("touchstart", listener);
+    };
+  }, [ref, handler]);
 }

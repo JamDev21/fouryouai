@@ -2,10 +2,10 @@
 
 import { useRef, useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-
-import { db } from "../src/lib/firebaseConfig";
+// RUTA EXACTA A TU FIREBASE:
+import { db } from "../src/lib/firebaseConfig"; 
 import { X, Plus, Loader2, Hash, AlignLeft, Tag, Layers } from "lucide-react";
-
+// RUTAS EXACTAS A TUS HOOKS Y TYPES:
 import { useClickOutside } from "../hooks/useClickOutside";
 import type { NuevoHiloForm } from "../types/foro";
 
@@ -73,7 +73,7 @@ export default function NuevoHiloModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
+    
     if (!form.titulo.trim() || !form.descripcion.trim() || !form.categoria) {
       setError("Llena los campos obligatorios.");
       return;
@@ -84,14 +84,14 @@ export default function NuevoHiloModal({
 
     try {
       await addDoc(collection(db, "foros_hilos"), {
-        titulo: form.titulo.trim(),
-        descripcion: form.descripcion.trim(),
-        categoria: form.categoria,
-        tags: form.tags,
+        titulo:             form.titulo.trim(),
+        descripcion:        form.descripcion.trim(),
+        categoria:          form.categoria,
+        tags:               form.tags,
         contadorRespuestas: 0,
-        fechaCreacion: serverTimestamp(),
-        id_autor: autorNombre,
-        id_hilo: "",
+        fechaCreacion:      serverTimestamp(),
+        id_autor:           autorNombre,
+        id_hilo:            "", 
       });
 
       setSuccess(true);
@@ -113,21 +113,13 @@ export default function NuevoHiloModal({
         className="w-full max-w-lg bg-[#0a0a0f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-          <h2 className="text-lg font-bold text-white">
-            Nuevo hilo de discusión
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-white/40 hover:text-white transition-colors"
-          >
+          <h2 className="text-lg font-bold text-white">Nuevo hilo de discusión</h2>
+          <button onClick={handleClose} className="text-white/40 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[75vh]"
-        >
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[75vh]">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-white/50 flex items-center gap-2">
               <Hash size={14} /> Título
@@ -149,9 +141,7 @@ export default function NuevoHiloModal({
               required
               rows={4}
               value={form.descripcion}
-              onChange={(e) =>
-                setForm({ ...form, descripcion: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500/50 transition-all resize-none"
             />
           </div>
@@ -167,8 +157,8 @@ export default function NuevoHiloModal({
                   type="button"
                   onClick={() => setForm({ ...form, categoria: cat })}
                   className={`px-3 py-1.5 rounded-full text-xs transition-all border ${
-                    form.categoria === cat
-                      ? "bg-violet-500/20 border-violet-500 text-violet-400"
+                    form.categoria === cat 
+                      ? "bg-violet-500/20 border-violet-500 text-violet-400" 
                       : "bg-white/5 border-white/5 text-white/40 hover:border-white/20"
                   }`}
                 >
@@ -186,28 +176,15 @@ export default function NuevoHiloModal({
               type="text"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && (e.preventDefault(), agregarTag())
-              }
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), agregarTag())}
               placeholder="Enter para añadir"
               className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500/50"
             />
             <div className="flex flex-wrap gap-2 mt-1">
               {form.tags.map((t) => (
-                <span
-                  key={t}
-                  className="bg-violet-500/10 border border-violet-500/30 text-violet-400 px-2.5 py-1 rounded-lg text-[10px] flex items-center gap-1"
-                >
+                <span key={t} className="bg-violet-500/10 border border-violet-500/30 text-violet-400 px-2.5 py-1 rounded-lg text-[10px] flex items-center gap-1">
                   #{t}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        tags: form.tags.filter((tag) => tag !== t),
-                      })
-                    }
-                  >
+                  <button type="button" onClick={() => setForm({ ...form, tags: form.tags.filter(tag => tag !== t) })}>
                     <X size={8} />
                   </button>
                 </span>
@@ -215,16 +192,8 @@ export default function NuevoHiloModal({
             </div>
           </div>
 
-          {error && (
-            <p className="text-xs text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">
-              {error}
-            </p>
-          )}
-          {success && (
-            <p className="text-xs text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20 text-center">
-              ¡Publicado!
-            </p>
-          )}
+          {error && <p className="text-xs text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</p>}
+          {success && <p className="text-xs text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20 text-center">¡Publicado! 🎉</p>}
 
           <div className="flex gap-3 mt-2">
             <button
@@ -239,11 +208,7 @@ export default function NuevoHiloModal({
               disabled={loading || success}
               className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20"
             >
-              {loading ? (
-                <Loader2 className="animate-spin" size={18} />
-              ) : (
-                "Publicar ahora"
-              )}
+              {loading ? <Loader2 className="animate-spin" size={18} /> : "Publicar ahora"}
             </button>
           </div>
         </form>

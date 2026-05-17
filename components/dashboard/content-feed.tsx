@@ -1,131 +1,71 @@
-"use client";
+"use client"
 
-import { usePersonalizedFeed } from "../../hooks/usePersonalizedFeed";
-import {
-  Sparkles,
-  Calendar,
-  Tag,
-  AlertCircle,
-  Flame,
-  Clock,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Sparkles, Clock, Flame } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ContentCard } from "./content-card"
 
-function SkeletonCard() {
-  return (
-    <div className="rounded-2xl overflow-hidden animate-pulse border border-white/5 bg-white/5">
-      <div className="w-full h-40 bg-white/10" />
-      <div className="p-4 flex flex-col gap-3">
-        <div className="h-3 w-1/3 rounded-full bg-white/10" />
-        <div className="h-4 w-4/5 rounded-full bg-white/15" />
-        <div className="h-3 w-full rounded-full bg-white/5" />
-        <div className="flex gap-2 mt-1">
-          <div className="h-5 w-16 rounded-full bg-white/5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ContentCard({
-  contenido,
-  intereses,
-}: {
-  contenido: any;
-  intereses: string[];
-}) {
-  const fecha = contenido.fechaCreacion?.seconds
-    ? new Date(contenido.fechaCreacion.seconds * 1000).toLocaleDateString(
-        "es-MX",
-        {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        },
-      )
-    : "Reciente";
-
-  const esRelevante = (contenido.relevancia ?? 0) > 0;
-
-  return (
-    <div
-      className={`group rounded-2xl border transition-all duration-200 hover:-translate-y-1 bg-white/5 ${
-        esRelevante
-          ? "border-violet-500/30 shadow-lg shadow-violet-500/5"
-          : "border-white/5"
-      }`}
-    >
-      {contenido.imagen ? (
-        <img
-          src={contenido.imagen}
-          alt={contenido.titulo}
-          className="w-full h-40 object-cover rounded-t-2xl"
-        />
-      ) : (
-        <div className="w-full h-40 flex items-center justify-center bg-violet-500/5 rounded-t-2xl">
-          <Sparkles size={28} className="text-violet-500/20" />
-        </div>
-      )}
-
-      <div className="p-4">
-        {esRelevante && (
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 font-bold uppercase tracking-wider">
-              <Sparkles size={9} /> Match
-            </span>
-          </div>
-        )}
-
-        <h3 className="text-sm font-semibold leading-snug line-clamp-2 text-white mb-2 group-hover:text-violet-300 transition-colors">
-          {contenido.titulo}
-        </h3>
-
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {contenido.tags?.map((tag: string) => {
-            const isMatch = intereses.some(
-              (i) =>
-                i === tag.toLowerCase() ||
-                i.includes(tag.toLowerCase()) ||
-                tag.toLowerCase().includes(i),
-            );
-            return (
-              <span
-                key={tag}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${
-                  isMatch
-                    ? "bg-violet-500/20 border border-violet-500/30 text-violet-200"
-                    : "bg-white/5 border border-white/5 text-white/30"
-                }`}
-              >
-                {isMatch && <Tag size={8} />}#{tag}
-              </span>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center justify-between pt-3 border-t border-white/5 text-[10px] text-white/20">
-          <span className="truncate max-w-[100px]">
-            {contenido.autor || "Fouryouai"}
-          </span>
-          <span className="flex items-center gap-1 shrink-0">
-            <Calendar size={10} /> {fecha}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+const feedData = [
+  {
+    author: {
+      name: "Dr. María González",
+      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
+      role: "Profesora de IA - MIT",
+    },
+    title: "Introducción a Machine Learning con Python: De Cero a Experto",
+    description: "Aprende los fundamentos del aprendizaje automático, desde regresión lineal hasta redes neuronales profundas con ejercicios prácticos.",
+    tags: ["MachineLearning", "Python", "DataScience"],
+    image: "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&h=340&fit=crop",
+    likes: 1234,
+    comments: 89,
+  },
+  {
+    author: {
+      name: "Carlos Mendoza",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+      role: "Senior Developer - Google",
+    },
+    title: "React 19: Nuevas Features y Server Components en Profundidad",
+    description: "Explora las últimas características de React 19, incluyendo Server Components, Actions y el nuevo modelo de renderizado.",
+    tags: ["React", "JavaScript", "Frontend"],
+    image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=600&h=340&fit=crop",
+    likes: 892,
+    comments: 56,
+    saved: true,
+  },
+  {
+    author: {
+      name: "Ana Rodríguez",
+      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
+      role: "Security Researcher - CyberLab",
+    },
+    title: "Ciberseguridad Ofensiva: Técnicas de Pentesting Modernas",
+    description: "Guía completa sobre metodologías de pentesting, desde reconocimiento hasta post-explotación con herramientas actualizadas.",
+    tags: ["Ciberseguridad", "Pentesting", "Hacking"],
+    image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600&h=340&fit=crop",
+    likes: 756,
+    comments: 34,
+  },
+  {
+    author: {
+      name: "Luis Herrera",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
+      role: "Data Engineer - Amazon",
+    },
+    title: "Arquitectura de Datos en la Nube: AWS vs Azure vs GCP",
+    description: "Comparativa detallada de servicios de datos en las principales plataformas cloud con casos de uso reales y benchmarks.",
+    tags: ["Cloud", "AWS", "DataEngineering"],
+    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop",
+    likes: 543,
+    comments: 28,
+  },
+]
 
 export function ContentFeed() {
-  const { contenidos, intereses, loading, error } = usePersonalizedFeed();
-
-  const relevantes = contenidos.filter((c) => (c.relevancia ?? 0) > 0);
-  const otrosConts = contenidos.filter((c) => (c.relevancia ?? 0) === 0);
-
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        <Button className="gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 font-medium text-white shadow-lg shadow-violet-500/25 transition-all">
+    <div className="space-y-6">
+      {/* Feed Tabs */}
+      <div className="flex items-center gap-2">
+        <Button className="gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 font-medium text-white shadow-lg shadow-violet-500/25 transition-all hover:shadow-violet-500/40">
           <Sparkles className="h-4 w-4" />
           Para ti
         </Button>
@@ -145,60 +85,22 @@ export function ContentFeed() {
         </Button>
       </div>
 
-      {loading && (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
-      )}
+      {/* Feed Grid */}
+      <div className="grid gap-6 sm:grid-cols-2">
+        {feedData.map((item, index) => (
+          <ContentCard key={index} {...item} />
+        ))}
+      </div>
 
-      {!loading && error && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300">
-          <AlertCircle size={18} /> {error}
-        </div>
-      )}
-
-      {!loading && !error && (
-        <div className="space-y-12">
-          {relevantes.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={14} className="text-violet-400" />
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
-                  Basado en tus intereses
-                </h2>
-              </div>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {relevantes.map((c) => (
-                  <ContentCard key={c.id} contenido={c} intereses={intereses} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
-                {relevantes.length > 0
-                  ? "Más contenidos"
-                  : "Todos los contenidos"}
-              </h2>
-            </div>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {otrosConts.map((c) => (
-                <ContentCard key={c.id} contenido={c} intereses={intereses} />
-              ))}
-            </div>
-          </section>
-
-          {contenidos.length === 0 && (
-            <div className="py-20 text-center text-white/20">
-              No hay contenidos disponibles.
-            </div>
-          )}
-        </div>
-      )}
+      {/* Load More */}
+      <div className="flex justify-center pt-4">
+        <Button
+          variant="outline"
+          className="rounded-xl border-violet-500/30 bg-transparent px-8 text-violet-300 transition-all hover:bg-violet-500/10 hover:text-violet-200"
+        >
+          Cargar más contenido
+        </Button>
+      </div>
     </div>
-  );
+  )
 }

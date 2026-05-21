@@ -2,8 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { Sparkles, Clock, Flame, ThumbsUp, Eye, Play, BookOpen, X } from "lucide-react"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
-import { db } from "@/src/lib/firebaseConfig"
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc, 
+  increment, 
+  getDoc, 
+  setDoc, 
+  deleteDoc, 
+  serverTimestamp 
+} from "firebase/firestore"
+import { db, auth } from "@/src/lib/firebaseConfig"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -30,14 +42,69 @@ interface ContenidoElemento {
 }
 
 // ============================================================
-// MODAL CONSTRUIDO DESDE CERO — SIN SHADCN DIALOG
+// LÓGICA GLOBAL PARA LIKES ÚNICOS (USADA EN DASHBOARD Y MODAL)
+// ============================================================
+const darLikeReal = async (contenidoId: string): Promise<number> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    alert("Inicia sesión para dar like");
+    return 0; // 0 significa que no hubo cambio
+  }
+
+  const likeRef = doc(db, "likes", `${userId}_${contenidoId}`);
+  const contenidoRef = doc(db, "contenidos", contenidoId);
+  const likeSnap = await getDoc(likeRef);
+  
+  if (likeSnap.exists()) {
+    // Si ya existe, lo quitamos
+    await deleteDoc(likeRef);
+    await updateDoc(contenidoRef, { likes: increment(-1) });
+    return -1; // Devolvemos -1 para restar en la UI
+  } else {
+    // Si no existe, lo agregamos
+    await setDoc(likeRef, { userId, contenidoId, fecha: serverTimestamp() });
+    await updateDoc(contenidoRef, { likes: increment(1) });
+    return 1; // Devolvemos 1 para sumar en la UI
+  }
+};
+
+// ============================================================
+// MODAL CONSTRUIDO DESDE CERO
 // ============================================================
 function ContentModal({ content, onClose }: { content: ContenidoElemento; onClose: () => void }) {
-  // Bloquear scroll del body mientras el modal está abierto
+  const [likes, setLikes] = useState(content.likes);
+  const [isLiking, setIsLiking] = useState(false); // Para evitar doble clic rápido
+  
+  // Función manejadora del like dentro del modal
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isLiking) return;
+    setIsLiking(true);
+
+    try {
+      const cambio = await darLikeReal(content.id);
+      setLikes(prev => prev + cambio); // Suma o resta al instante en el modal
+    } catch (error) {
+      console.error("Error al dar like:", error);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+  
+  // Bloquear scroll y registrar vista
   useEffect(() => {
-    document.body.style.overflow = "hidden"
-    return () => { document.body.style.overflow = "" }
-  }, [])
+    document.body.style.overflow = "hidden";
+    
+    const registrarVista = async () => {
+      try {
+        const contenidoRef = doc(db, "contenidos", content.id);
+        await updateDoc(contenidoRef, { vistas: increment(1) });
+      } catch (error) { console.error("Error vista:", error); }
+    };
+    registrarVista();
+
+    return () => { document.body.style.overflow = "" };
+  }, [content.id]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -47,119 +114,87 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
   }, [onClose])
 
   return (
-    // Overlay
-    <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          onClick={onClose}
-        >
-      {/* Contenedor del modal — altura fija, flex column */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-  className="relative w-full max-w-2xl border border-white/10 rounded-3xl text-gray-200 overflow-hidden flex flex-col shadow-2xl backdrop-blur-2xl"
-  style={{
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Menos negro, más transparente
-    height: "85vh",
-    maxHeight: "85vh",
-  }}
-  onClick={(e) => e.stopPropagation()}
->
-        {/* Botón cerrar — fijo en la esquina */}
-        <button
-              onClick={onClose}
-              className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
-            >
-              <X size={18} />
-            </button>
+        className="relative w-full max-w-2xl border border-white/10 rounded-3xl text-gray-200 overflow-hidden flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+        style={{ backgroundColor: "rgba(0, 0, 0, 0.7)", height: "85vh", maxHeight: "85vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all">
+          <X size={18} />
+        </button>
 
-        {/* Zona scrolleable — flex-1 + minHeight:0 es la clave */}
-        <div
-  className="flex-1 overflow-y-auto p-6 md:p-8"
-  style={{
-    scrollbarWidth: "none", // Oculta scroll en Firefox
-  }}
-  // El pseudo-elemento para Chrome/Safari/Edge:
-  // (Debes agregar esto en tu archivo CSS global o usar un estilo en línea)
->
-  <style jsx>{`
-    div::-webkit-scrollbar {
-      display: none;
-    }
-  `}</style>
-          {/* <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}> */}
-            <div className="space-y-6">
-            {/* Cabecera autor */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "1rem", paddingRight: "2rem" }}>
-              <Avatar className="h-10 w-10 border border-purple-500/30">
-                <AvatarImage src={content.autorAvatar} />
-                <AvatarFallback className="bg-purple-900 text-purple-200 font-bold text-xs">
-                  {content.autorNombre.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 style={{ fontSize: "0.875rem", fontWeight: 700, color: "white", margin: 0 }}>{content.autorNombre}</h3>
-                <p style={{ fontSize: "0.75rem", color: "rgba(196,181,253,0.7)", margin: 0 }}>{content.autorOcupacion}</p>
+        <div className="flex-1 overflow-y-auto p-6 md:p-8" style={{ scrollbarWidth: "none" }}>
+          <style jsx>{`div::-webkit-scrollbar { display: none; }`}</style>
+          
+          <div className="space-y-6">
+            
+            {/* Cabecera del Modal (Autor y Botón Like) */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 pr-10">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10 border border-purple-500/30">
+                  <AvatarImage src={content.autorAvatar} />
+                  <AvatarFallback>{content.autorNombre.substring(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-sm font-bold text-white">{content.autorNombre}</h3>
+                  <p className="text-xs text-purple-300/70">{content.autorOcupacion}</p>
+                </div>
               </div>
+              <Button onClick={handleLike} disabled={isLiking} variant="ghost" className="flex items-center gap-2 text-purple-400 hover:bg-purple-900/20">
+                <ThumbsUp size={18} />
+                <span className="font-bold">{likes}</span>
+              </Button>
             </div>
 
-            {/* Título y etiquetas */}
+            {/* Resto del contenido del modal */}
             <div>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: 800, color: "white", lineHeight: 1.3, paddingRight: "2rem", margin: 0 }}>
-                {content.titulo}
-              </h2>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", marginTop: "0.75rem" }}>
+              <h2 className="text-2xl font-extrabold text-white tracking-tight leading-tight pr-6">{content.titulo}</h2>
+              <div className="flex flex-wrap gap-1.5 mt-3">
                 {content.etiquetas.map((tag) => (
-                  <Badge key={tag} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-medium px-2.5 py-0.5 rounded-md">
-                    #{tag}
-                  </Badge>
+                  <Badge key={tag} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-medium px-2.5 py-0.5 rounded-md">#{tag}</Badge>
                 ))}
               </div>
             </div>
 
-            {/* Media */}
-            <div style={{ width: "100%", borderRadius: "1rem", overflow: "hidden", backgroundColor: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div className="w-full rounded-2xl overflow-hidden bg-black/80 border border-white/5 shadow-inner">
               {content.tipo === "video" ? (
-                <video src={content.urlMedia} controls autoPlay style={{ width: "100%", aspectRatio: "16/9", objectFit: "contain" }} />
+                <video src={content.urlMedia} controls autoPlay className="w-full aspect-video object-contain" />
               ) : (
-                <img src={content.urlMedia} alt={content.titulo} style={{ width: "100%", maxHeight: "420px", objectFit: "contain", display: "block", margin: "0 auto" }} />
+                <img src={content.urlMedia} alt={content.titulo} className="w-full max-h-[420px] object-contain mx-auto" />
               )}
             </div>
 
-            {/* Descripción */}
-            <div style={{ backgroundColor: "rgba(0,0,0,0.4)", padding: "1.5rem", borderRadius: "1rem", border: "1px solid rgba(255,255,255,0.05)" }}>
-              <h4 style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgb(192,132,252)", marginBottom: "0.75rem", margin: "0 0 0.75rem 0" }}>
-                Descripción Completa
-              </h4>
-              <p style={{ fontSize: "0.875rem", color: "rgb(209,213,219)", lineHeight: 1.7, whiteSpace: "pre-line", margin: 0 }}>
-                {content.descripcion}
-              </p>
+            <div className="space-y-3 bg-black/40 p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400">Descripción Completa</h4>
+              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{content.descripcion}</p>
             </div>
 
             {/* Colaboradores y Etiquetados */}
-            {((content.colaboradoresNombres && content.colaboradoresNombres.length > 0) ||
-              (content.etiquetadosNombres && content.etiquetadosNombres.length > 0)) && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", paddingTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem" }}>
+            {((content.colaboradoresNombres && content.colaboradoresNombres.length > 0) || (content.etiquetadosNombres && content.etiquetadosNombres.length > 0)) && (
+              <div className="grid gap-4 sm:grid-cols-2 pt-4 border-t border-white/10 text-xs">
                 {content.colaboradoresNombres && content.colaboradoresNombres.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <span style={{ color: "rgb(156,163,175)", fontWeight: 600 }}>Colaboradores de este recurso:</span>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", backgroundColor: "rgba(88,28,135,0.3)", padding: "0.75rem", borderRadius: "0.75rem", border: "1px solid rgba(168,85,247,0.2)" }}>
+                  <div className="space-y-2">
+                    <span className="text-gray-400 font-semibold">Colaboradores:</span>
+                    <div className="flex flex-wrap gap-1 bg-purple-900/30 p-3 rounded-xl border border-purple-500/20">
                       {content.colaboradoresNombres.map((nombre, i) => (
-                        <span key={i} style={{ backgroundColor: "rgba(0,0,0,0.5)", padding: "0.25rem 0.5rem", borderRadius: "0.375rem", border: "1px solid rgba(255,255,255,0.1)", color: "rgb(233,213,255)" }}>{nombre}</span>
+                        <span key={i} className="bg-black/50 px-2 py-1 rounded-md border border-white/10 text-purple-200">{nombre}</span>
                       ))}
                     </div>
                   </div>
                 )}
                 {content.etiquetadosNombres && content.etiquetadosNombres.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <span style={{ color: "rgb(156,163,175)", fontWeight: 600 }}>Personas Etiquetadas:</span>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", backgroundColor: "rgba(49,46,129,0.3)", padding: "0.75rem", borderRadius: "0.75rem", border: "1px solid rgba(99,102,241,0.2)" }}>
+                  <div className="space-y-2">
+                    <span className="text-gray-400 font-semibold">Etiquetados:</span>
+                    <div className="flex flex-wrap gap-1 bg-indigo-900/30 p-3 rounded-xl border border-indigo-500/20">
                       {content.etiquetadosNombres.map((nombre, i) => (
-                        <span key={i} style={{ backgroundColor: "rgba(0,0,0,0.5)", padding: "0.25rem 0.5rem", borderRadius: "0.375rem", border: "1px solid rgba(255,255,255,0.1)", color: "rgb(199,210,254)" }}>{nombre}</span>
+                        <span key={i} className="bg-black/50 px-2 py-1 rounded-md border border-white/10 text-indigo-200">{nombre}</span>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
             )}
-
           </div>
         </div>
       </div>
@@ -167,6 +202,9 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
   )
 }
 
+// ============================================================
+// COMPONENTE PRINCIPAL DEL DASHBOARD
+// ============================================================
 export function ContentFeed() {
   const [activeTab, setActiveTab] = useState<"para-ti" | "trending" | "recientes">("para-ti")
   const [contenidos, setContenidos] = useState<ContenidoElemento[]>([])
@@ -197,8 +235,6 @@ export function ContentFeed() {
           const infoAutor = mapaUsuarios[data.autorId] || {}
           const colaboradoresIds: string[] = data.colaboradores || []
           const etiquetadosIds: string[] = data.etiquetados || []
-          const colaboradoresNombres = colaboradoresIds.map(uid => mapaUsuarios[uid]?.nombre || `Usuario (${uid.substring(0, 4)})`)
-          const etiquetadosNombres = etiquetadosIds.map(uid => mapaUsuarios[uid]?.nombre || `Usuario (${uid.substring(0, 4)})`)
           
           return {
             id: doc.id,
@@ -211,8 +247,8 @@ export function ContentFeed() {
             autorNombre: data.autorNombre || "Usuario Anónimo",
             etiquetados: etiquetadosIds,
             colaboradores: colaboradoresIds,
-            colaboradoresNombres,
-            etiquetadosNombres,
+            colaboradoresNombres: colaboradoresIds.map(uid => mapaUsuarios[uid]?.nombre || `Usuario (${uid.substring(0, 4)})`),
+            etiquetadosNombres: etiquetadosIds.map(uid => mapaUsuarios[uid]?.nombre || `Usuario (${uid.substring(0, 4)})`),
             fechaCreacion: data.fechaCreacion,
             vistas: data.vistas || 0,
             likes: data.likes || 0,
@@ -223,7 +259,7 @@ export function ContentFeed() {
 
         setContenidos(listaContenidos)
       } catch (error) {
-        console.error("Error al construir el feed dinámico:", error)
+        console.error("Error al cargar:", error)
       } finally {
         setLoading(false)
       }
@@ -232,22 +268,27 @@ export function ContentFeed() {
     cargarFeedReal()
   }, [activeTab])
 
+  // Función manejadora del like desde la tarjeta en el dashboard
+  const handleLikeCard = async (e: React.MouseEvent, contenidoId: string) => {
+    e.stopPropagation(); // Evita abrir el modal
+    const cambio = await darLikeReal(contenidoId);
+    
+    // Actualización local rápida para que se vea reflejado en la lista
+    if (cambio !== 0) {
+      setContenidos(prev => prev.map(item => 
+        item.id === contenidoId ? { ...item, likes: item.likes + cambio } : item
+      ));
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Pestañas */}
       <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-        <Button onClick={() => setActiveTab("para-ti")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "para-ti" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "para-ti" ? "default" : "ghost"}>
-          <Sparkles className="h-4 w-4" /> Para ti
-        </Button>
-        <Button onClick={() => setActiveTab("trending")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "trending" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "trending" ? "default" : "ghost"}>
-          <Flame className="h-4 w-4" /> Trending
-        </Button>
-        <Button onClick={() => setActiveTab("recientes")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "recientes" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "recientes" ? "default" : "ghost"}>
-          <Clock className="h-4 w-4" /> Recientes
-        </Button>
+        <Button onClick={() => setActiveTab("para-ti")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "para-ti" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "para-ti" ? "default" : "ghost"}><Sparkles className="h-4 w-4" /> Para ti</Button>
+        <Button onClick={() => setActiveTab("trending")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "trending" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "trending" ? "default" : "ghost"}><Flame className="h-4 w-4" /> Trending</Button>
+        <Button onClick={() => setActiveTab("recientes")} className={`gap-2 rounded-xl px-5 font-medium transition-all ${activeTab === "recientes" ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25" : "text-gray-400 hover:bg-white/5 hover:text-white"}`} variant={activeTab === "recientes" ? "default" : "ghost"}><Clock className="h-4 w-4" /> Recientes</Button>
       </div>
 
-      {/* Grid del Feed */}
       {loading ? (
         <div className="grid gap-6 sm:grid-cols-2">
           {[1, 2, 3, 4].map((n) => (
@@ -265,7 +306,7 @@ export function ContentFeed() {
         </div>
       ) : contenidos.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-2xl bg-[#11111a]/30">
-          <p className="text-gray-500 text-sm">Aún no hay recursos guardados en la base de datos.</p>
+          <p className="text-gray-500 text-sm">Aún no hay recursos guardados.</p>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
@@ -274,7 +315,7 @@ export function ContentFeed() {
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar className="h-9 w-9 border border-purple-500/20">
-                    <AvatarImage src={item.autorAvatar} alt={item.autorNombre} />
+                    <AvatarImage src={item.autorAvatar} />
                     <AvatarFallback className="bg-purple-950 text-purple-300 font-bold text-xs">{item.autorNombre.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="overflow-hidden">
@@ -304,7 +345,12 @@ export function ContentFeed() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 hover:text-purple-400"><ThumbsUp size={13} /> {item.likes}</span>
+                    <button 
+                      onClick={(e) => handleLikeCard(e, item.id)}
+                      className="flex items-center gap-1 hover:text-purple-400 transition-colors"
+                    >
+                      <ThumbsUp size={13} /> {item.likes}
+                    </button>
                     <span className="flex items-center gap-1"><Eye size={13} /> {item.vistas}</span>
                   </div>
                   {item.tipo === "video" ? (
@@ -319,7 +365,6 @@ export function ContentFeed() {
         </div>
       )}
 
-      {/* Modal personalizado sin shadcn */}
       {selectedContent && (
         <ContentModal content={selectedContent} onClose={() => setSelectedContent(null)} />
       )}

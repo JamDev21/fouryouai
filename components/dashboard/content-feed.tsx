@@ -13,7 +13,8 @@ import {
   getDoc, 
   setDoc, 
   deleteDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  addDoc // <-- Importación necesaria para crear la notificación
 } from "firebase/firestore"
 import { db, auth } from "@/src/lib/firebaseConfig"
 import { Button } from "@/components/ui/button"
@@ -42,12 +43,35 @@ interface ContenidoElemento {
 }
 
 // ============================================================
-// LÓGICA GLOBAL PARA LIKES ÚNICOS (USADA EN DASHBOARD Y MODAL)
+// FUNCIÓN PARA ENVIAR NOTIFICACIONES
 // ============================================================
-const darLikeReal = async (contenidoId: string): Promise<number> => {
+const enviarNotificacion = async ({ receptorId, tipo, emisorId, emisorNombre, contenidoId, mensaje }: any) => {
+  // Evitamos que te llegue una notificación si tú mismo le das like a tu post
+  if (!receptorId || receptorId === emisorId) return; 
+
+  try {
+    const notifRef = collection(db, "usuarios", receptorId, "notificaciones");
+    await addDoc(notifRef, {
+      tipo,
+      emisorId,
+      emisorNombre,
+      contenidoId,
+      mensaje,
+      leida: false,
+      fechaCreacion: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error al enviar notificación:", error);
+  }
+};
+
+// ============================================================
+// LÓGICA GLOBAL PARA LIKES ÚNICOS CON NOTIFICACIONES
+// ============================================================
+const darLikeReal = async (contenidoId: string, autorId: string, miNombre: string): Promise<number> => {
   const userId = auth.currentUser?.uid;
   if (!userId) {
-    alert("Inicia sesión para dar like");
+    alert("Inicia sesión para interactuar.");
     return 0; // 0 significa que no hubo cambio
   }
 
@@ -64,6 +88,17 @@ const darLikeReal = async (contenidoId: string): Promise<number> => {
     // Si no existe, lo agregamos
     await setDoc(likeRef, { userId, contenidoId, fecha: serverTimestamp() });
     await updateDoc(contenidoRef, { likes: increment(1) });
+    
+    // AQUÍ DISPARAMOS LA NOTIFICACIÓN AL AUTOR DEL POST
+    await enviarNotificacion({
+      receptorId: autorId,
+      tipo: "like",
+      emisorId: userId,
+      emisorNombre: miNombre,
+      contenidoId: contenidoId,
+      mensaje: "le dio like a tu publicación."
+    });
+
     return 1; // Devolvemos 1 para sumar en la UI
   }
 };
@@ -73,7 +108,7 @@ const darLikeReal = async (contenidoId: string): Promise<number> => {
 // ============================================================
 function ContentModal({ content, onClose }: { content: ContenidoElemento; onClose: () => void }) {
   const [likes, setLikes] = useState(content.likes);
-  const [isLiking, setIsLiking] = useState(false); // Para evitar doble clic rápido
+  const [isLiking, setIsLiking] = useState(false);
   
   // Función manejadora del like dentro del modal
   const handleLike = async (e: React.MouseEvent) => {
@@ -82,7 +117,9 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
     setIsLiking(true);
 
     try {
-      const cambio = await darLikeReal(content.id);
+      // Tomamos el nombre del usuario actual para la notificación (o un default)
+      const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
+      const cambio = await darLikeReal(content.id, content.autorId, miNombre);
       setLikes(prev => prev + cambio); // Suma o resta al instante en el modal
     } catch (error) {
       console.error("Error al dar like:", error);
@@ -269,14 +306,15 @@ export function ContentFeed() {
   }, [activeTab])
 
   // Función manejadora del like desde la tarjeta en el dashboard
-  const handleLikeCard = async (e: React.MouseEvent, contenidoId: string) => {
+  const handleLikeCard = async (e: React.MouseEvent, item: ContenidoElemento) => {
     e.stopPropagation(); // Evita abrir el modal
-    const cambio = await darLikeReal(contenidoId);
+    const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
+    const cambio = await darLikeReal(item.id, item.autorId, miNombre);
     
     // Actualización local rápida para que se vea reflejado en la lista
     if (cambio !== 0) {
-      setContenidos(prev => prev.map(item => 
-        item.id === contenidoId ? { ...item, likes: item.likes + cambio } : item
+      setContenidos(prev => prev.map(c => 
+        c.id === item.id ? { ...c, likes: c.likes + cambio } : c
       ));
     }
   };
@@ -346,7 +384,7 @@ export function ContentFeed() {
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={(e) => handleLikeCard(e, item.id)}
+                      onClick={(e) => handleLikeCard(e, item)}
                       className="flex items-center gap-1 hover:text-purple-400 transition-colors"
                     >
                       <ThumbsUp size={13} /> {item.likes}

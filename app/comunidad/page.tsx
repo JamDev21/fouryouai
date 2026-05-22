@@ -27,6 +27,26 @@ interface NuevoHiloModalProps {
   onHiloCreado: () => void; 
 }
 
+const enviarNotificacion = async ({ receptorId, tipo, emisorId, emisorNombre, contenidoId, mensaje }: any) => {
+  // Evitamos que te llegue una notificación si tú mismo le das like a tu post
+  if (!receptorId || receptorId === emisorId) return; 
+
+  try {
+    const notifRef = collection(db, "usuarios", receptorId, "notificaciones");
+    await addDoc(notifRef, {
+      tipo,
+      emisorId,
+      emisorNombre,
+      contenidoId,
+      mensaje,
+      leida: false,
+      fechaCreacion: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error al enviar notificación:", error);
+  }
+};
+
 function NuevoHiloModal({ onClose, onHiloCreado }: NuevoHiloModalProps) {
   const [titulo, setTitulo] = useState("")
   const [descripcion, setDescripcion] = useState("")
@@ -186,34 +206,86 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     cargarDatos()
   }, [hilo.id])
 
+  // 🟢 FUNCIÓN ACTUALIZADA: Manejador para publicar respuestas y detectar menciones
   const handleResponder = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!nuevaRespuesta.trim()) return
-    setIsSubmitting(true)
+    e.preventDefault();
+    if (!nuevaRespuesta.trim()) return;
+    setIsSubmitting(true);
 
     try {
-      const userId = auth.currentUser?.uid || "anonimo"
+      const userId = auth.currentUser?.uid || "anonimo";
+      const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
 
+      // 1. Detección de Menciones (Buscamos palabras que empiecen con @)
+      // La Regex busca @ seguido de letras, números o guiones bajos
+      const mencionesEncontradas = nuevaRespuesta.match(/@\w+/g) || [];
+      const uidsMencionados: string[] = [];
+
+      // Si hay menciones, cruzamos los nombres con nuestro mapaUsuarios para sacar sus UIDs
+      if (mencionesEncontradas.length > 0) {
+        // Limpiamos la arroba para tener solo los nombres: ["Carlos", "Elena"]
+        const nombresPuros = mencionesEncontradas.map(m => m.substring(1));
+        
+        // Iteramos nuestro mapaUsuarios para ver si esos nombres existen
+        Object.entries(mapaUsuarios).forEach(([uid, data]) => {
+           if (nombresPuros.includes(data.nombre)) {
+              // Evitamos auto-mencionarnos
+              if (uid !== userId) {
+                uidsMencionados.push(uid);
+              }
+           }
+        });
+      }
+
+      // 2. Guardamos la respuesta en la colección (ahora con las menciones)
       await addDoc(collection(db, "foros_respuestas"), {
         contenido: nuevaRespuesta.trim(),
         id_autor: userId,
         id_hilo: hilo.id,
         fechaCreacion: serverTimestamp(),
-        reacciones: {} // Inicializamos vacío
-      })
+        reacciones: {},
+        menciones: uidsMencionados // 🟢 Guardamos el array de UIDs por si sirve en el futuro
+      });
 
-      const hiloRef = doc(db, "foros_hilos", hilo.id)
+      // 3. Aumentamos el contador en el hilo original
+      const hiloRef = doc(db, "foros_hilos", hilo.id);
       await updateDoc(hiloRef, {
         contadorRespuestas: increment(1)
-      })
+      });
 
-      setNuevaRespuesta("")
+      // 4. DISPARAMOS NOTIFICACIONES
+      // A) Notificamos a las personas que fueron mencionadas
+      for (const receptorUid of uidsMencionados) {
+        await enviarNotificacion({
+          receptorId: receptorUid,
+          tipo: "mencion",
+          emisorId: userId,
+          emisorNombre: miNombre,
+          contenidoId: hilo.id, // Ojo: los mandamos al hilo para que lo abran
+          mensaje: "te mencionó en un hilo de comunidad."
+        });
+      }
+
+      // B) Notificamos al autor original del hilo que alguien respondió
+      // (Solo si no es el mismo autor respondiendo a su propio hilo y si no lo acabamos de mencionar)
+      if (hilo.id_autor && hilo.id_autor !== userId && !uidsMencionados.includes(hilo.id_autor)) {
+        await enviarNotificacion({
+          receptorId: hilo.id_autor,
+          tipo: "comentario",
+          emisorId: userId,
+          emisorNombre: miNombre,
+          contenidoId: hilo.id,
+          mensaje: "respondió a tu hilo."
+        });
+      }
+
+      setNuevaRespuesta(""); // Limpiamos el input
     } catch (error) {
-      console.error("Error al publicar respuesta:", error)
+      console.error("Error al publicar respuesta:", error);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   // 🟢 FUNCIÓN ACTUALIZADA: Manejador de Reacciones (Estilo Facebook - Única opción)
   const handleReaccion = async (respuestaId: string, emojiSeleccionado: string, reaccionesActuales: Record<string, string[]> = {}) => {

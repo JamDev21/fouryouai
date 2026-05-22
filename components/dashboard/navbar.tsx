@@ -3,13 +3,16 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation" 
-import { Search, Plus, Compass, Users, User, LogIn, LogOut } from "lucide-react"
+import { Plus, Compass, Users, User, LogIn, LogOut } from "lucide-react" // Quitamos Search de aquí porque ya está dentro de SearchBar
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../src/lib/firebaseConfig";
 import NotificationBell from "../NotificationBell";
+
+// 🟢 IMPORTAMOS EL NUEVO BUSCADOR (Ajusta la ruta si lo guardaste en otra carpeta)
+import { SearchBar } from "./SearchBar"; 
 
 export function Navbar() {
   const pathname = usePathname(); 
@@ -54,16 +57,9 @@ export function Navbar() {
           </span>
         </Link>
 
-        {/* Barra de Búsqueda */}
-        <div className="hidden flex-1 max-w-xl mx-8 md:block">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar cursos, temas, docentes..."
-              className="w-full rounded-xl border border-[var(--glass-border)] bg-[#12121a] py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground backdrop-blur-sm transition-all focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-            />
-          </div>
+        {/* 🟢 BARRA DE BÚSQUEDA INTELIGENTE REEMPLAZADA */}
+        <div className="hidden flex-1 max-w-xl mx-8 md:flex justify-center">
+          <SearchBar />
         </div>
 
         {/* Links de Navegación */}

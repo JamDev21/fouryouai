@@ -2,9 +2,10 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Bell, MessageCircle, PlayCircle, ThumbsUp, AtSign, CheckCheck, Users } from "lucide-react";
-import { collection, query, orderBy, limit, onSnapshot, writeBatch, doc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, writeBatch, doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "@/src/lib/firebaseConfig";
-import { useClickOutside } from "../hooks/useClickOutside"; // Asegúrate de que esta ruta siga siendo correcta
+import { useClickOutside } from "../hooks/useClickOutside";
+import { useRouter } from "next/navigation";
 
 // Adaptamos el tipo a los que definimos para Firebase
 type NotifType = "like" | "comentario" | "mencion" | "colaboracion" | "video";
@@ -14,11 +15,11 @@ interface Notification {
   tipo: NotifType;
   mensaje: string;
   emisorNombre: string;
-  fechaCreacion: any; // Timestamp de Firebase
+  fechaCreacion: any;
   leida: boolean;
+  contenidoId: string; // 🟢 Necesario para saber a dónde redirigir
 }
 
-// Función auxiliar para convertir el Timestamp de Firebase a "hace X min"
 const formatTimeAgo = (timestamp: any) => {
   if (!timestamp) return "justo ahora";
   const date = timestamp.toDate();
@@ -35,19 +36,20 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Inicializamos el router para la redirección
+  const router = useRouter();
 
-  // ESCUCHADOR EN TIEMPO REAL (FIREBASE)
+  // ESCUCHADOR EN TIEMPO REAL
   useEffect(() => {
-    // Esperamos a que el usuario esté autenticado
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
         const q = query(
           collection(db, "usuarios", user.uid, "notificaciones"),
           orderBy("fechaCreacion", "desc"),
-          limit(15) // Traemos solo las últimas 15 para no saturar
+          limit(15)
         );
 
-        // onSnapshot actualiza el estado automáticamente si hay cambios en la BD
         const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
           const notifs = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -70,7 +72,6 @@ export default function NotificationBell() {
 
   useClickOutside(containerRef, () => setOpen(false));
 
-  // Función para marcar todas las no leídas como leídas en Firebase
   const marcarTodasComoLeidas = async () => {
     const userId = auth.currentUser?.uid;
     if (!userId || unreadCount === 0) return;
@@ -83,17 +84,44 @@ export default function NotificationBell() {
           batch.update(notifRef, { leida: true });
         }
       });
-      await batch.commit(); // Ejecutamos todas las actualizaciones de golpe
+      await batch.commit();
     } catch (error) {
       console.error("Error al marcar como leídas:", error);
     }
   };
 
   const handleToggle = () => {
+    // Si abrimos la campana y hay no leídas, las marcamos todas
     if (!open && unreadCount > 0) {
       marcarTodasComoLeidas();
     }
     setOpen(!open);
+  };
+
+  // 🟢 NUEVA FUNCIÓN: Manejador de clics en cada notificación
+  const handleNotificacionClick = async (notif: Notification) => {
+    setOpen(false); // 1. Cerramos el menú
+
+    // 2. Si por alguna razón no se marcó como leída en el batch, lo forzamos aquí
+    if (!notif.leida && auth.currentUser) {
+      try {
+        const notifRef = doc(db, "usuarios", auth.currentUser.uid, "notificaciones", notif.id);
+        await updateDoc(notifRef, { leida: true });
+      } catch (error) {
+        console.error("Error al marcar como leída:", error);
+      }
+    }
+
+    // 3. Lógica de Redirección Inteligente
+    if (!notif.contenidoId) return; // Si no hay ID a donde ir, no hacemos nada
+
+    if (notif.tipo === "comentario" || notif.tipo === "mencion") {
+      // Va a la comunidad y pasa el ID por la URL
+      router.push(`/comunidad?hilo=${notif.contenidoId}`);
+    } else {
+      // Va al inicio (dashboard) y pasa el ID del recurso
+      router.push(`/?recurso=${notif.contenidoId}`);
+    }
   };
 
   return (
@@ -129,9 +157,12 @@ export default function NotificationBell() {
               </li>
             ) : (
               notifications.map((notif) => (
-                <li key={notif.id} className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5">
+                <li 
+                  key={notif.id}
+                  onClick={() => handleNotificacionClick(notif)} // 🟢 Evento Clic
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 cursor-pointer" // 🟢 Cursor-pointer añadido
+                >
                   <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-purple-500/10 text-purple-400">
-                    {/* Renderizamos el icono según el tipo de notificación */}
                     {notif.tipo === 'video' ? <PlayCircle size={14} /> : 
                      notif.tipo === 'comentario' ? <MessageCircle size={14} /> :
                      notif.tipo === 'mencion' ? <AtSign size={14} /> :

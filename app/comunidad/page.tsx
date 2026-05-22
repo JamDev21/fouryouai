@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSearchParams } from "next/navigation";
 
 // Tipado actualizado para coincidir con tu BD
 interface Hilo {
@@ -472,12 +473,26 @@ export default function ComunidadFeed() {
   const [filtroActivo, setFiltroActivo] = useState<"recientes" | "populares" | "sin-responder">("recientes")
   const [hilos, setHilos] = useState<Hilo[]>([])
   const [loading, setLoading] = useState(true)
+  
  
   
   // 🟢 ESTADOS PARA EL MODAL
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [hiloSeleccionado, setHiloSeleccionado] = useState<Hilo | null>(null)
+
+  const searchParams = useSearchParams();
+  const hiloIdParam = searchParams.get("hilo"); // Lee '?hilo=ID' de la URL
+
+
+  useEffect(() => {
+    if (hiloIdParam && hilos.length > 0) {
+      const hiloEncontrado = hilos.find(h => h.id === hiloIdParam);
+      if (hiloEncontrado) {
+        setHiloSeleccionado(hiloEncontrado);
+      }
+    }
+  }, [hiloIdParam, hilos]);
 
   useEffect(() => {
     const cargarHilos = async () => {

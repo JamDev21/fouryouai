@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSearchParams } from "next/navigation";
 
 interface ContenidoElemento {
   id: string;
@@ -248,6 +249,20 @@ export function ContentFeed() {
   const [loading, setLoading] = useState(true)
   const [selectedContent, setSelectedContent] = useState<ContenidoElemento | null>(null)
 
+  const searchParams = useSearchParams();
+  const recursoIdParam = searchParams.get("recurso"); // Lee '?recurso=ID' de la URL
+
+
+  useEffect(() => {
+    if (recursoIdParam && contenidos.length > 0) {
+      // Buscamos si el recurso de la notificación ya está cargado en la lista
+      const recursoEncontrado = contenidos.find(c => c.id === recursoIdParam);
+      if (recursoEncontrado) {
+        setSelectedContent(recursoEncontrado);
+      }
+    }
+  }, [recursoIdParam, contenidos]);
+  
   useEffect(() => {
     const cargarFeedReal = async () => {
       setLoading(true)

@@ -1,43 +1,130 @@
 "use client"
 
-import Link from "next/link"
-import { Construction, ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { Navbar } from "@/components/dashboard/navbar"
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from "firebase/firestore"
+import { db, auth } from "@/src/lib/firebaseConfig"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useSearchParams } from "next/navigation"
+import { BookOpen, Mic2, FileText, Code2, GraduationCap } from "lucide-react"
 
-export default function UnderConstruction() {
+const CATEGORIAS = [
+  { id: "curso", label: "Cursos", icon: GraduationCap },
+  { id: "podcast", label: "Podcasts", icon: Mic2 },
+  { id: "paper", label: "Papers/PDF", icon: FileText },
+  { id: "proyecto", label: "Proyectos", icon: Code2 }
+];
+
+export default function ExplorarPage() {
+  const searchParams = useSearchParams();
+  const filtroTipo = searchParams.get("tipo"); 
+  const [contenidos, setContenidos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cargarRecursos = async () => {
+      setLoading(true);
+      try {
+        // 1. Obtener intereses del usuario para el motor de IA
+        let misIntereses: Record<string, number> = {};
+        const miUid = auth.currentUser?.uid;
+        if (miUid) {
+          const userDoc = await getDoc(doc(db, "usuarios", miUid));
+          misIntereses = userDoc.data()?.vectorIntereses || {};
+        }
+
+        // 2. Query dinámica
+        const baseQuery = collection(db, "contenidos");
+        let q;
+
+        if (filtroTipo) {
+          q = query(baseQuery, where("tipo", "==", filtroTipo), orderBy("fechaCreacion", "desc"));
+        } else {
+          q = query(baseQuery, where("tipo", "in", ["curso", "podcast", "paper", "proyecto"]), orderBy("fechaCreacion", "desc"));
+        }
+
+        const snapshot = await getDocs(q);
+        
+        // 3. Motor de Recomendación (Cálculo de Score)
+        const data = snapshot.docs.map(doc => {
+          const docData = doc.data();
+          const etiquetas = docData.etiquetas || [];
+          
+          let score = 0;
+          etiquetas.forEach((tag: string) => {
+            if (misIntereses[tag]) score += misIntereses[tag];
+          });
+
+          return { id: doc.id, ...docData, score };
+        });
+
+        // 4. Ordenar por relevancia (IA)
+        data.sort((a, b) => b.score - a.score);
+
+        setContenidos(data);
+      } catch (e) {
+        console.error("Error al explorar:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    //  Dependencia correcta: si cambia el filtroTipo, se recarga la IA
+    cargarRecursos();
+  }, [filtroTipo]); 
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Graduate Effects (Copia de la estética del Dashboard) */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-violet-600/20 blur-[100px]" />
-        <div className="absolute -right-40 top-1/4 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-violet-500/10 blur-[100px]" />
-      </div>
-
-      <div className="relative z-10 text-center max-w-lg bg-[#12121a]/80 border border-purple-500/20 p-12 rounded-3xl shadow-2xl backdrop-blur-xl">
-        {/* Icono de Construcción con Animación Pulsante */}
-        <div className="flex items-center justify-center mb-10">
-          <div className="p-6 bg-violet-500/10 rounded-full border border-violet-500/30 animate-pulse">
-            <Construction className="h-20 w-20 text-violet-400" strokeWidth={1} />
-          </div>
-        </div>
-
-        {/* Título y Descripción */}
-        <h1 className="text-5xl font-extrabold text-white mb-6 tracking-tight leading-tight">
-          🚧 Página <span className="text-violet-400">En Construcción</span>
-        </h1>
-        <p className="text-lg text-gray-400 mb-12 leading-relaxed">
-          Estamos trabajando arduamente en esta sección para traerte una experiencia increíble en Fouryou.ai. ¡Muy pronto estará lista! Mientras tanto, puedes explorar otras partes de la plataforma.
+    <div className="min-h-screen bg-[#0a0a0f] text-gray-200">
+      <Navbar />
+      
+      <main className="max-w-6xl mx-auto px-6 py-12">
+        <h1 className="text-4xl font-extrabold text-white mb-2">Explorar Recursos</h1>
+        <p className="text-gray-400 mb-10">
+          {filtroTipo ? `Resultados para: ${filtroTipo}` : "Material de estudio profundo y proyectos destacados."}
         </p>
 
-        {/* Botón para Volver al Dashboard */}
-        <Link href="/">
-          <Button className="w-full gap-3 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 px-8 py-6 text-xl font-semibold text-white shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 hover:brightness-110">
-            <ArrowLeft className="h-5 w-5" />
-            Volver al Dashboard
-          </Button>
-        </Link>
-      </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-64 rounded-2xl bg-white/5" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {CATEGORIAS.map((cat) => {
+              // Si hay un filtro (ej. ?tipo=curso), solo mostramos esa categoría
+              if (filtroTipo && filtroTipo !== cat.id) return null;
+
+              const items = contenidos.filter(c => c.tipo === cat.id);
+              return (
+                <div key={cat.id} className="space-y-4">
+                  <h2 className="flex items-center gap-2 text-lg font-bold text-white mb-4">
+                    <cat.icon className="text-purple-500" /> {cat.label}
+                  </h2>
+                  
+                  {items.length === 0 ? (
+                    <div className="h-32 flex items-center justify-center border border-dashed border-white/10 rounded-xl text-xs text-gray-600">
+                      Sin recursos en esta categoría...
+                    </div>
+                  ) : (
+                    items.map(item => (
+                      <div key={item.id} className="bg-[#11111a] p-4 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group">
+                        {/* Indicador visual de IA */}
+                        {item.score > 0 && (
+                          <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-2 block">★ Recomendado</span>
+                        )}
+                        <h3 className="font-semibold text-sm text-white mb-1 line-clamp-1">{item.titulo}</h3>
+                        <p className="text-xs text-gray-400 line-clamp-2">{item.descripcion}</p>
+                        <a href={item.urlMedia} target="_blank" className="mt-3 block text-xs font-bold text-purple-400 hover:text-purple-300">
+                          Ir al recurso →
+                        </a>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
     </div>
   )
 }

@@ -175,15 +175,23 @@ export default function SubirContenidoPage() {
               <label className="mb-2 block text-sm font-medium">Tipo de contenido</label>
               <select 
                 className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
-                onChange={(e) => setForm({...form, tipo: e.target.value})}
+                value={form.tipo}
+                onChange={(e) => {
+                  setForm({...form, tipo: e.target.value});
+                  setMediaUrl(""); // Limpiamos la URL al cambiar de tipo
+                }}
               >
                 <option value="">Seleccionar...</option>
-                <option value="video">Video</option>
-                <option value="articulo">Artículo</option>
+                <option value="video">Video Corto</option>
+                <option value="articulo">Artículo Corto</option>
+                <option value="curso">Curso</option>
+                <option value="podcast">Podcast</option>
+                <option value="paper">Paper / PDF</option>
+                <option value="proyecto">Proyecto / Repo</option>
               </select>
             </div>
 
-            {/* SECCIÓN DE ETIQUETAS ACTUALIZADA */}
+            {/* SECCIÓN DE ETIQUETAS */}
             <div>
               <label className="mb-2 block text-sm font-medium">Etiquetas (Presiona Enter)</label>
               <div className="w-full rounded-lg border border-white/10 bg-black/40 p-2 focus-within:border-purple-500 flex flex-wrap gap-2">
@@ -203,6 +211,38 @@ export default function SubirContenidoPage() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="pt-2">
+            <label className="mb-2 block text-sm font-medium text-white">
+              {["video", "articulo"].includes(form.tipo) 
+                ? "Sube tu archivo a Fouryou" 
+                : "Enlace externo al recurso"}
+            </label>
+
+            {form.tipo === "" ? (
+              <div className="rounded-xl border-2 border-dashed border-gray-800 bg-[#0a0a0f]/50 p-10 text-center text-sm text-gray-500">
+                ⚠️ Primero selecciona el "Tipo de contenido" arriba.
+              </div>
+            ) : ["video", "articulo"].includes(form.tipo) ? (
+              mediaUrl ? (
+                <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-6 text-center">
+                  <span className="text-green-400 font-medium">✅ Archivo subido correctamente</span>
+                </div>
+              ) : (
+                <MediaUpload 
+                  type={form.tipo === "video" ? "video" : "image"} 
+                  onUploadSuccess={(url) => setMediaUrl(url)} 
+                />
+              )
+            ) : (
+              <input 
+                type="url"
+                className="w-full rounded-lg border border-white/10 bg-black/40 p-3 outline-none focus:border-purple-500"
+                placeholder={`Pega aquí el enlace de tu ${form.tipo}...`}
+                onChange={(e) => setMediaUrl(e.target.value)} // Guardamos el link en mediaUrl para reutilizar el estado
+              />
+            )}
           </div>
 
           <div className="border-t border-white/10 pt-4">

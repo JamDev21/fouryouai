@@ -15,7 +15,8 @@ import {
   deleteDoc, 
   serverTimestamp,
   addDoc,
-  limit // + Importación extraída para limitar los queries
+  limit,
+  where // + Importación extraída para limitar los queries
 } from "firebase/firestore"
 import { db, auth } from "@/src/lib/firebaseConfig"
 import { Button } from "@/components/ui/button"
@@ -275,14 +276,16 @@ export function ContentFeed() {
         // 2. Ejecutar la Query Correcta según la Pestaña
         const contenidosRef = collection(db, "contenidos");
         let contenidosQuery;
+        
+        const tiposDashboard = ["video", "articulo"];
 
         if (activeTab === "recientes") {
-          contenidosQuery = query(contenidosRef, orderBy("fechaCreacion", "desc"), limit(20));
+          contenidosQuery = query(contenidosRef, where("tipo", "in", tiposDashboard), orderBy("fechaCreacion", "desc"), limit(20));
         } else if (activeTab === "trending") {
-          contenidosQuery = query(contenidosRef, orderBy("likes", "desc"), limit(20));
+          contenidosQuery = query(contenidosRef, where("tipo", "in", tiposDashboard), orderBy("likes", "desc"), limit(20));
         } else {
           // Para Ti: Traemos una muestra amplia para evaluar similitudes
-          contenidosQuery = query(contenidosRef, orderBy("fechaCreacion", "desc"), limit(50));
+          contenidosQuery = query(contenidosRef, where("tipo", "in", tiposDashboard), orderBy("fechaCreacion", "desc"), limit(50));
         }
 
         const contenidosSnapshot = await getDocs(contenidosQuery)
@@ -343,6 +346,9 @@ export function ContentFeed() {
 
     cargarFeedReal()
   }, [activeTab]) // + IMPORTANTE: El useEffect se recarga cada que cambia la pestaña
+
+
+
 
   const handleLikeCard = async (e: React.MouseEvent, item: ContenidoElemento) => {
     e.stopPropagation(); 

@@ -1,12 +1,12 @@
-export const dynamic = 'force-dynamic';
 "use client";
 import { poblarBaseDeDatos } from '../src/lib/seedDB';
 import { Navbar } from "@/components/dashboard/navbar"
 import { ContentFeed } from "@/components/dashboard/content-feed"
 import { TrendingTopics } from "@/components/dashboard/trending-topics"
+import { Suspense } from "react";
 import { Suggestions } from "@/components/dashboard/suggestions"
 
-export default function Dashboard() {
+function DashboardContent() {
   return (
     <>
       <div className="min-h-screen bg-[#0a0a0f]"> {/* Añadí pt-12 para que la barra no tape el Navbar */}
@@ -40,3 +40,14 @@ export default function Dashboard() {
     </>
   )
 }
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      </div>
+    }>
+      <DashboardContent/>
+    </Suspense>
+  )

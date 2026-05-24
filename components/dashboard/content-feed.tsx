@@ -14,7 +14,8 @@ import {
   setDoc, 
   deleteDoc, 
   serverTimestamp,
-  addDoc // <-- Importación necesaria para crear la notificación
+  addDoc,
+  limit // + Importación extraída para limitar los queries
 } from "firebase/firestore"
 import { db, auth } from "@/src/lib/firebaseConfig"
 import { Button } from "@/components/ui/button"
@@ -41,13 +42,13 @@ interface ContenidoElemento {
   likes: number;
   autorAvatar?: string;
   autorOcupacion?: string;
+  score?: number; // + Propiedad temporal para el algoritmo
 }
 
 // ============================================================
 // FUNCIÓN PARA ENVIAR NOTIFICACIONES
 // ============================================================
 const enviarNotificacion = async ({ receptorId, tipo, emisorId, emisorNombre, contenidoId, mensaje }: any) => {
-  // Evitamos que te llegue una notificación si tú mismo le das like a tu post
   if (!receptorId || receptorId === emisorId) return; 
 
   try {
@@ -73,7 +74,7 @@ const darLikeReal = async (contenidoId: string, autorId: string, miNombre: strin
   const userId = auth.currentUser?.uid;
   if (!userId) {
     alert("Inicia sesión para interactuar.");
-    return 0; // 0 significa que no hubo cambio
+    return 0;
   }
 
   const likeRef = doc(db, "likes", `${userId}_${contenidoId}`);
@@ -81,16 +82,13 @@ const darLikeReal = async (contenidoId: string, autorId: string, miNombre: strin
   const likeSnap = await getDoc(likeRef);
   
   if (likeSnap.exists()) {
-    // Si ya existe, lo quitamos
     await deleteDoc(likeRef);
     await updateDoc(contenidoRef, { likes: increment(-1) });
-    return -1; // Devolvemos -1 para restar en la UI
+    return -1; 
   } else {
-    // Si no existe, lo agregamos
     await setDoc(likeRef, { userId, contenidoId, fecha: serverTimestamp() });
     await updateDoc(contenidoRef, { likes: increment(1) });
     
-    // AQUÍ DISPARAMOS LA NOTIFICACIÓN AL AUTOR DEL POST
     await enviarNotificacion({
       receptorId: autorId,
       tipo: "like",
@@ -100,7 +98,7 @@ const darLikeReal = async (contenidoId: string, autorId: string, miNombre: strin
       mensaje: "le dio like a tu publicación."
     });
 
-    return 1; // Devolvemos 1 para sumar en la UI
+    return 1; 
   }
 };
 
@@ -111,17 +109,15 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
   const [likes, setLikes] = useState(content.likes);
   const [isLiking, setIsLiking] = useState(false);
   
-  // Función manejadora del like dentro del modal
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLiking) return;
     setIsLiking(true);
 
     try {
-      // Tomamos el nombre del usuario actual para la notificación (o un default)
       const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
       const cambio = await darLikeReal(content.id, content.autorId, miNombre);
-      setLikes(prev => prev + cambio); // Suma o resta al instante en el modal
+      setLikes(prev => prev + cambio); 
     } catch (error) {
       console.error("Error al dar like:", error);
     } finally {
@@ -129,7 +125,6 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
     }
   };
   
-  // Bloquear scroll y registrar vista
   useEffect(() => {
     document.body.style.overflow = "hidden";
     
@@ -144,7 +139,6 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
     return () => { document.body.style.overflow = "" };
   }, [content.id]);
 
-  // Cerrar con Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     window.addEventListener("keydown", handler)
@@ -166,8 +160,6 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
           <style jsx>{`div::-webkit-scrollbar { display: none; }`}</style>
           
           <div className="space-y-6">
-            
-            {/* Cabecera del Modal (Autor y Botón Like) */}
             <div className="flex items-center justify-between border-b border-white/10 pb-4 pr-10">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 border border-purple-500/30">
@@ -185,7 +177,6 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
               </Button>
             </div>
 
-            {/* Resto del contenido del modal */}
             <div>
               <h2 className="text-2xl font-extrabold text-white tracking-tight leading-tight pr-6">{content.titulo}</h2>
               <div className="flex flex-wrap gap-1.5 mt-3">
@@ -208,7 +199,6 @@ function ContentModal({ content, onClose }: { content: ContenidoElemento; onClos
               <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{content.descripcion}</p>
             </div>
 
-            {/* Colaboradores y Etiquetados */}
             {((content.colaboradoresNombres && content.colaboradoresNombres.length > 0) || (content.etiquetadosNombres && content.etiquetadosNombres.length > 0)) && (
               <div className="grid gap-4 sm:grid-cols-2 pt-4 border-t border-white/10 text-xs">
                 {content.colaboradoresNombres && content.colaboradoresNombres.length > 0 && (
@@ -250,12 +240,10 @@ export function ContentFeed() {
   const [selectedContent, setSelectedContent] = useState<ContenidoElemento | null>(null)
 
   const searchParams = useSearchParams();
-  const recursoIdParam = searchParams.get("recurso"); // Lee '?recurso=ID' de la URL
-
+  const recursoIdParam = searchParams.get("recurso"); 
 
   useEffect(() => {
     if (recursoIdParam && contenidos.length > 0) {
-      // Buscamos si el recurso de la notificación ya está cargado en la lista
       const recursoEncontrado = contenidos.find(c => c.id === recursoIdParam);
       if (recursoEncontrado) {
         setSelectedContent(recursoEncontrado);
@@ -267,33 +255,62 @@ export function ContentFeed() {
     const cargarFeedReal = async () => {
       setLoading(true)
       try {
+        // 1. Cargar Usuarios y sus Intereses
         const usuariosSnapshot = await getDocs(collection(db, "usuarios"))
-        const mapaUsuarios: Record<string, { nombre: string; avatar?: string; ocupacion?: string }> = {}
+        const mapaUsuarios: Record<string, { nombre: string; avatar?: string; ocupacion?: string; vectorIntereses?: Record<string, number> }> = {}
         
         usuariosSnapshot.forEach((doc) => {
           const data = doc.data()
           mapaUsuarios[doc.id] = {
             nombre: data.nombre || "Usuario de Fouryou",
             avatar: data.fotoPerfil || data.avatar || "",
-            ocupacion: data.ocupacion || data.rol || "Estudiante"
+            ocupacion: data.ocupacion || data.rol || "Estudiante",
+            vectorIntereses: data.vectorIntereses || {} // + Guardamos el vector
           }
         })
 
-        const contenidosQuery = query(collection(db, "contenidos"), orderBy("fechaCreacion", "desc"))
+        const miUsuarioId = auth.currentUser?.uid;
+        const misIntereses = miUsuarioId ? (mapaUsuarios[miUsuarioId]?.vectorIntereses || {}) : {};
+
+        // 2. Ejecutar la Query Correcta según la Pestaña
+        const contenidosRef = collection(db, "contenidos");
+        let contenidosQuery;
+
+        if (activeTab === "recientes") {
+          contenidosQuery = query(contenidosRef, orderBy("fechaCreacion", "desc"), limit(20));
+        } else if (activeTab === "trending") {
+          contenidosQuery = query(contenidosRef, orderBy("likes", "desc"), limit(20));
+        } else {
+          // Para Ti: Traemos una muestra amplia para evaluar similitudes
+          contenidosQuery = query(contenidosRef, orderBy("fechaCreacion", "desc"), limit(50));
+        }
+
         const contenidosSnapshot = await getDocs(contenidosQuery)
         
-        const listaContenidos: ContenidoElemento[] = contenidosSnapshot.docs.map((doc) => {
+        // 3. Mapeo y Ponderación del Motor
+        let listaContenidos: ContenidoElemento[] = contenidosSnapshot.docs.map((doc) => {
           const data = doc.data()
           const infoAutor = mapaUsuarios[data.autorId] || {}
           const colaboradoresIds: string[] = data.colaboradores || []
           const etiquetadosIds: string[] = data.etiquetados || []
+          const etiquetasDelPost: string[] = data.etiquetas || []
           
+          // + Producto Punto para Similitud (Motor de IA Local)
+          let score = 0;
+          if (activeTab === "para-ti" && Object.keys(misIntereses).length > 0) {
+            etiquetasDelPost.forEach((tag) => {
+              if (misIntereses[tag]) {
+                score += misIntereses[tag]; // Match encontrado! Sube el score.
+              }
+            });
+          }
+
           return {
             id: doc.id,
             titulo: data.titulo || "Sin título",
             descripcion: data.descripcion || "",
             tipo: data.tipo || "articulo",
-            etiquetas: data.etiquetas || [],
+            etiquetas: etiquetasDelPost,
             urlMedia: data.urlMedia || "",
             autorId: data.autorId || "",
             autorNombre: data.autorNombre || "Usuario Anónimo",
@@ -305,9 +322,16 @@ export function ContentFeed() {
             vistas: data.vistas || 0,
             likes: data.likes || 0,
             autorAvatar: infoAutor.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.autorId}`,
-            autorOcupacion: infoAutor.ocupacion || "Miembro de la Comunidad"
+            autorOcupacion: infoAutor.ocupacion || "Miembro de la Comunidad",
+            score: score // Guardamos el score para ordenar
           }
         })
+
+        // 4. Ordenamiento Inteligente
+        if (activeTab === "para-ti") {
+          // Ordena los contenidos de mayor coincidencia a menor coincidencia
+          listaContenidos.sort((a, b) => (b.score || 0) - (a.score || 0));
+        }
 
         setContenidos(listaContenidos)
       } catch (error) {
@@ -318,15 +342,13 @@ export function ContentFeed() {
     }
 
     cargarFeedReal()
-  }, [activeTab])
+  }, [activeTab]) // + IMPORTANTE: El useEffect se recarga cada que cambia la pestaña
 
-  // Función manejadora del like desde la tarjeta en el dashboard
   const handleLikeCard = async (e: React.MouseEvent, item: ContenidoElemento) => {
-    e.stopPropagation(); // Evita abrir el modal
+    e.stopPropagation(); 
     const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
     const cambio = await darLikeReal(item.id, item.autorId, miNombre);
     
-    // Actualización local rápida para que se vea reflejado en la lista
     if (cambio !== 0) {
       setContenidos(prev => prev.map(c => 
         c.id === item.id ? { ...c, likes: c.likes + cambio } : c
@@ -359,7 +381,7 @@ export function ContentFeed() {
         </div>
       ) : contenidos.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-2xl bg-[#11111a]/30">
-          <p className="text-gray-500 text-sm">Aún no hay recursos guardados.</p>
+          <p className="text-gray-500 text-sm">Aún no hay recursos guardados o no coinciden con tus intereses.</p>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">

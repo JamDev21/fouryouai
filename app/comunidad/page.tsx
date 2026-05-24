@@ -1,16 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, TrendingUp, MessageCircleQuestion, Plus, MessageSquare, X } from "lucide-react"
+// 🟢 Agregamos 'Sparkles' para el ícono de la IA
+import { Clock, TrendingUp, MessageCircleQuestion, Plus, MessageSquare, X, Sparkles } from "lucide-react"
 import { collection, getDocs, query, orderBy, where, limit, addDoc, serverTimestamp, onSnapshot, increment, updateDoc, doc, arrayUnion, arrayRemove} from "firebase/firestore"
-import { db, auth } from "@/src/lib/firebaseConfig" // Asegúrate de importar 'auth'
+import { db, auth } from "@/src/lib/firebaseConfig" 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSearchParams } from "next/navigation";
 
-// Tipado actualizado para coincidir con tu BD
 interface Hilo {
   id: string;
   titulo: string;
@@ -21,6 +21,7 @@ interface Hilo {
   tags: string[];
   fechaCreacion: any;
   contadorRespuestas: number;
+  score?: number; // 🟢 Propiedad para guardar el puntaje de similitud
 }
 
 interface NuevoHiloModalProps {
@@ -29,7 +30,6 @@ interface NuevoHiloModalProps {
 }
 
 const enviarNotificacion = async ({ receptorId, tipo, emisorId, emisorNombre, contenidoId, mensaje }: any) => {
-  // Evitamos que te llegue una notificación si tú mismo le das like a tu post
   if (!receptorId || receptorId === emisorId) return; 
 
   try {
@@ -145,7 +145,6 @@ function NuevoHiloModal({ onClose, onHiloCreado }: NuevoHiloModalProps) {
   )
 }
 
-
 interface Respuesta {
   id: string;
   contenido: string;
@@ -153,7 +152,7 @@ interface Respuesta {
   autorNombreResolvido?: string;
   autorAvatarResolvido?: string;
   fechaCreacion: any;
-  reacciones?: Record<string, string[]>; // 🟢 NUEVO: Mapa de emojis y usuarios
+  reacciones?: Record<string, string[]>;
 }
 
 interface HiloDetalleModalProps {
@@ -161,7 +160,6 @@ interface HiloDetalleModalProps {
   onClose: () => void;
 }
 
-// Los emojis que la comunidad podrá usar
 const EMOJIS_DISPONIBLES = ["🔥", "💡", "👏", "💯"];
 
 function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
@@ -170,15 +168,12 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mapaUsuarios, setMapaUsuarios] = useState<Record<string, any>>({})
 
-  // Bloquear scroll
   useEffect(() => {
     document.body.style.overflow = "hidden"
     return () => { document.body.style.overflow = "" }
   }, [])
 
-  // Cargar usuarios y respuestas en tiempo real
   useEffect(() => {
-    // 1. Descargamos las fotos de perfil actuales
     const cargarUsuarios = async () => {
       try {
         const snap = await getDocs(collection(db, "usuarios"));
@@ -198,7 +193,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     
     cargarUsuarios();
 
-    // 2. Escuchamos solo las respuestas de ESTE hilo en tiempo real
     const qRespuestas = query(
       collection(db, "foros_respuestas"),
       where("id_hilo", "==", hilo.id),
@@ -217,7 +211,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     return () => unsubscribe();
   }, [hilo.id]);
 
-  //  FUNCIÓN ACTUALIZADA: Manejador para publicar respuestas y detectar menciones
   const handleResponder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevaRespuesta.trim()) return;
@@ -227,20 +220,13 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
       const userId = auth.currentUser?.uid || "anonimo";
       const miNombre = auth.currentUser?.displayName || "Un miembro de la comunidad";
 
-      // 1. Detección de Menciones (Buscamos palabras que empiecen con @)
-      // La Regex busca @ seguido de letras, números o guiones bajos
       const mencionesEncontradas = nuevaRespuesta.match(/@\w+/g) || [];
       const uidsMencionados: string[] = [];
 
-      // Si hay menciones, cruzamos los nombres con nuestro mapaUsuarios para sacar sus UIDs
       if (mencionesEncontradas.length > 0) {
-        // Limpiamos la arroba para tener solo los nombres: ["Carlos", "Elena"]
         const nombresPuros = mencionesEncontradas.map(m => m.substring(1));
-        
-        // Iteramos nuestro mapaUsuarios para ver si esos nombres existen
         Object.entries(mapaUsuarios).forEach(([uid, data]) => {
            if (nombresPuros.includes(data.nombre)) {
-              // Evitamos auto-mencionarnos
               if (uid !== userId) {
                 uidsMencionados.push(uid);
               }
@@ -248,37 +234,31 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
         });
       }
 
-      // 2. Guardamos la respuesta en la colección (ahora con las menciones)
       await addDoc(collection(db, "foros_respuestas"), {
         contenido: nuevaRespuesta.trim(),
         id_autor: userId,
         id_hilo: hilo.id,
         fechaCreacion: serverTimestamp(),
         reacciones: {},
-        menciones: uidsMencionados // 🟢 Guardamos el array de UIDs por si sirve en el futuro
+        menciones: uidsMencionados 
       });
 
-      // 3. Aumentamos el contador en el hilo original
       const hiloRef = doc(db, "foros_hilos", hilo.id);
       await updateDoc(hiloRef, {
         contadorRespuestas: increment(1)
       });
 
-      // 4. DISPARAMOS NOTIFICACIONES
-      // A) Notificamos a las personas que fueron mencionadas
       for (const receptorUid of uidsMencionados) {
         await enviarNotificacion({
           receptorId: receptorUid,
           tipo: "mencion",
           emisorId: userId,
           emisorNombre: miNombre,
-          contenidoId: hilo.id, // Ojo: los mandamos al hilo para que lo abran
+          contenidoId: hilo.id,
           mensaje: "te mencionó en un hilo de comunidad."
         });
       }
 
-      // B) Notificamos al autor original del hilo que alguien respondió
-      // (Solo si no es el mismo autor respondiendo a su propio hilo y si no lo acabamos de mencionar)
       if (hilo.id_autor && hilo.id_autor !== userId && !uidsMencionados.includes(hilo.id_autor)) {
         await enviarNotificacion({
           receptorId: hilo.id_autor,
@@ -290,7 +270,7 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
         });
       }
 
-      setNuevaRespuesta(""); // Limpiamos el input
+      setNuevaRespuesta(""); 
     } catch (error) {
       console.error("Error al publicar respuesta:", error);
     } finally {
@@ -298,7 +278,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     }
   };
 
-  // 🟢 FUNCIÓN ACTUALIZADA: Manejador de Reacciones (Estilo Facebook - Única opción)
   const handleReaccion = async (respuestaId: string, emojiSeleccionado: string, reaccionesActuales: Record<string, string[]> = {}) => {
     const userId = auth.currentUser?.uid;
     if (!userId) {
@@ -307,26 +286,19 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     }
 
     const respuestaRef = doc(db, "foros_respuestas", respuestaId);
-    
-    // Objeto para agrupar todas las instrucciones que le mandaremos a Firebase
     const actualizaciones: Record<string, any> = {};
 
-    // Iteramos por todos los emojis para limpiar los anteriores y setear el nuevo
     EMOJIS_DISPONIBLES.forEach(emoji => {
       const usuariosQueDieronClic = reaccionesActuales[emoji] || [];
       const usuarioYaEstabaAqui = usuariosQueDieronClic.includes(userId);
 
       if (emoji === emojiSeleccionado) {
-        // ¿Le dio clic al mismo emoji que ya tenía? Se lo quitamos (Toggle Off)
         if (usuarioYaEstabaAqui) {
           actualizaciones[`reacciones.${emoji}`] = arrayRemove(userId);
-        } 
-        // ¿Es un emoji nuevo para él? Se lo agregamos
-        else {
+        } else {
           actualizaciones[`reacciones.${emoji}`] = arrayUnion(userId);
         }
       } else {
-        // Si es CUALQUIER OTRO emoji diferente al seleccionado, y el usuario estaba ahí, lo quitamos
         if (usuarioYaEstabaAqui) {
           actualizaciones[`reacciones.${emoji}`] = arrayRemove(userId);
         }
@@ -334,7 +306,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
     });
 
     try {
-      // Mandamos todas las órdenes a Firebase en un solo viaje
       if (Object.keys(actualizaciones).length > 0) {
         await updateDoc(respuestaRef, actualizaciones);
       }
@@ -415,7 +386,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
                       <AvatarFallback className="text-xs">{autor.nombre?.substring(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      {/* Tarjeta del comentario */}
                       <div className="bg-white/[0.03] border border-white/5 rounded-2xl rounded-tl-none p-4">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-sm text-purple-300">{autor.nombre}</span>
@@ -424,7 +394,6 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
                         <p className="text-sm text-gray-300 whitespace-pre-line">{resp.contenido}</p>
                       </div>
 
-                      {/* 🟢 ZONA DE REACCIONES DEBAJO DEL COMENTARIO */}
                       <div className="flex items-center gap-2 mt-2 ml-1">
                         {EMOJIS_DISPONIBLES.map(emoji => {
                           const usuariosQueDieronClic = reacc[emoji] || [];
@@ -437,8 +406,8 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
                               onClick={() => handleReaccion(resp.id, emoji, reacc)}
                               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] transition-all border ${
                                 yoLeDiClic
-                                  ? "bg-purple-600/20 border-purple-500/50 text-purple-300" // Botón prendido
-                                  : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white" // Botón apagado
+                                  ? "bg-purple-600/20 border-purple-500/50 text-purple-300" 
+                                  : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white" 
                               }`}
                             >
                               <span>{emoji}</span>
@@ -480,20 +449,16 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
 }
 
 export default function ComunidadFeed() {
-  const [filtroActivo, setFiltroActivo] = useState<"recientes" | "populares" | "sin-responder">("recientes")
+  // 🟢 Agregamos "para-ti" al estado inicial
+  const [filtroActivo, setFiltroActivo] = useState<"para-ti" | "recientes" | "populares" | "sin-responder">("para-ti")
   const [hilos, setHilos] = useState<Hilo[]>([])
   const [loading, setLoading] = useState(true)
-  
- 
-  
-  // 🟢 ESTADOS PARA EL MODAL
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [hiloSeleccionado, setHiloSeleccionado] = useState<Hilo | null>(null)
 
   const searchParams = useSearchParams();
-  const hiloIdParam = searchParams.get("hilo"); // Lee '?hilo=ID' de la URL
-
+  const hiloIdParam = searchParams.get("hilo"); 
 
   useEffect(() => {
     if (hiloIdParam && hilos.length > 0) {
@@ -508,36 +473,53 @@ export default function ComunidadFeed() {
     const cargarHilos = async () => {
       setLoading(true); 
       try {
-        // 1. Cargamos a todos los usuarios para obtener sus fotos de perfil MÁS RECIENTES
         const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
-        const mapaUsuarios: Record<string, { nombre: string; avatar?: string }> = {};
+        // 🟢 Añadimos vectorIntereses al mapeo
+        const mapaUsuarios: Record<string, { nombre: string; avatar?: string; vectorIntereses?: Record<string, number> }> = {};
         
         usuariosSnapshot.forEach((doc) => {
           const data = doc.data();
           mapaUsuarios[doc.id] = { 
             nombre: data.nombre || "Usuario Desconocido", 
-            avatar: data.fotoPerfil || data.avatar || "" 
+            avatar: data.fotoPerfil || data.avatar || "",
+            vectorIntereses: data.vectorIntereses || {}
           };
         });
 
-        // 2. Cargamos la colección de hilos según el filtro
+        const miUsuarioId = auth.currentUser?.uid;
+        const misIntereses = miUsuarioId ? (mapaUsuarios[miUsuarioId]?.vectorIntereses || {}) : {};
+
         const hilosRef = collection(db, "foros_hilos");
         let q;
 
+        // 🟢 Lógica de los queries adaptada
         if (filtroActivo === "recientes") {
           q = query(hilosRef, orderBy("fechaCreacion", "desc"), limit(20));
         } else if (filtroActivo === "populares") {
           q = query(hilosRef, orderBy("contadorRespuestas", "desc"), limit(20));
         } else if (filtroActivo === "sin-responder") {
           q = query(hilosRef, where("contadorRespuestas", "==", 0), orderBy("fechaCreacion", "desc"), limit(20));
+        } else {
+          // "para-ti" trae una muestra más amplia para ponderar
+          q = query(hilosRef, orderBy("fechaCreacion", "desc"), limit(50));
         }
 
         const snapshot = await getDocs(q!);
         
-        // 3. Cruzamos los hilos con la foto actual del usuario
-        const listaHilos = snapshot.docs.map(doc => {
+        let listaHilos = snapshot.docs.map(doc => {
           const data = doc.data();
           const infoAutor = mapaUsuarios[data.id_autor] || { nombre: data.id_autor, avatar: "" };
+          const tagsDelHilo = data.tags || [];
+
+          // 🟢 Motor Matemático de Similitud
+          let score = 0;
+          if (filtroActivo === "para-ti" && Object.keys(misIntereses).length > 0) {
+            tagsDelHilo.forEach((tag: string) => {
+              if (misIntereses[tag]) {
+                score += misIntereses[tag];
+              }
+            });
+          }
 
           return {
             id: doc.id,
@@ -546,11 +528,17 @@ export default function ComunidadFeed() {
             id_autor: data.id_autor || "",
             autorNombreResolvido: infoAutor.nombre,       
             autorAvatarResolvido: infoAutor.avatar,       
-            tags: data.tags || [],
+            tags: tagsDelHilo,
             fechaCreacion: data.fechaCreacion,
-            contadorRespuestas: data.contadorRespuestas || 0
+            contadorRespuestas: data.contadorRespuestas || 0,
+            score: score
           };
         }) as Hilo[];
+
+        // 🟢 Ordenamiento del filtro "Para ti"
+        if (filtroActivo === "para-ti") {
+          listaHilos.sort((a, b) => (b.score || 0) - (a.score || 0));
+        }
 
         setHilos(listaHilos);
       } catch (error) {
@@ -577,7 +565,6 @@ export default function ComunidadFeed() {
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Comunidad</h1>
           <p className="text-sm text-gray-400 mt-1">Discusiones académicas · tiempo real</p>
         </div>
-        {/* 🟢 BOTÓN PARA ABRIR MODAL */}
         <Button 
           onClick={() => setIsModalOpen(true)}
           className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 py-5 font-semibold shadow-lg shadow-purple-600/20 transition-all flex items-center gap-2"
@@ -587,6 +574,8 @@ export default function ComunidadFeed() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-white/5 pb-4">
+        {/* 🟢 Agregamos el botón "Para ti" con su estilo visual */}
+        <Button onClick={() => setFiltroActivo("para-ti")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "para-ti" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><Sparkles size={14} /> Para ti</Button>
         <Button onClick={() => setFiltroActivo("recientes")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "recientes" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><Clock size={14} /> Recientes</Button>
         <Button onClick={() => setFiltroActivo("populares")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "populares" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><TrendingUp size={14} /> Populares</Button>
         <Button onClick={() => setFiltroActivo("sin-responder")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "sin-responder" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><MessageCircleQuestion size={14} /> Sin responder</Button>
@@ -643,7 +632,6 @@ export default function ComunidadFeed() {
         )}
       </div>
 
-      {/* 🟢 RENDER DEL MODAL CONDICIONAL */}
       {isModalOpen && (
         <NuevoHiloModal 
           onClose={() => setIsModalOpen(false)} 

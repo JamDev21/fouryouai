@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 "use client";
 import { poblarBaseDeDatos } from '../src/lib/seedDB';
 import { Navbar } from "@/components/dashboard/navbar"

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Plus, Compass, Users, User, LogIn, LogOut } from "lucide-react" // Quitamos Search de aquí porque ya está dentro de SearchBar
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Image from "next/image";
 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -67,15 +68,21 @@ export function Navbar() {
         
         {/* Logo -> Al hacer clic, te lleva al inicio */}
         <Link href="/" className="flex items-center gap-2 transition-transform hover:scale-105">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/25">
-            <span className="text-lg font-bold text-white">4</span>
+          <div className="relative h-9 w-9 overflow-hidden rounded-lg">
+            <Image 
+              src="/icon-dark-32x32.png" 
+              alt="Fouryou.ai Logo"
+              fill
+              className="object-contain"
+              priority 
+            />
           </div>
           <span className="text-xl font-bold text-foreground">
             Fouryou<span className="text-violet-400">.ai</span>
           </span>
         </Link>
 
-        {/* 🟢 BARRA DE BÚSQUEDA INTELIGENTE REEMPLAZADA */}
+        {/*  BARRA DE BÚSQUEDA INTELIGENTE REEMPLAZADA */}
         <div className="hidden flex-1 max-w-xl mx-8 md:flex justify-center">
           <SearchBar />
         </div>

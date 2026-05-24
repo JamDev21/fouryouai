@@ -8,26 +8,44 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../../src/lib/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../src/lib/firebaseConfig";
 import NotificationBell from "../NotificationBell";
 
-// 🟢 IMPORTAMOS EL NUEVO BUSCADOR (Ajusta la ruta si lo guardaste en otra carpeta)
+//  IMPORTAMOS EL NUEVO BUSCADOR (Ajusta la ruta si lo guardaste en otra carpeta)
 import { SearchBar } from "./SearchBar"; 
 
 export function Navbar() {
   const pathname = usePathname(); 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false); 
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    // Escuchar el estado de la autenticación
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
         setUserName(user.displayName || "Usuario");
+
+        //  BUSCAMOS LA FOTO EN FIRESTORE EN TIEMPO REAL
+        try {
+          const docRef = doc(db, "usuarios", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            // Guardamos la foto real si existe
+            setUserAvatar(data.fotoPerfil || data.avatar || null);
+          }
+        } catch (error) {
+          console.error("Error al cargar avatar en Navbar:", error);
+        }
+
       } else {
         setIsLoggedIn(false);
         setUserName("");
+        setUserAvatar(null); // Limpiamos la foto
       }
     });
     return () => unsubscribe();
@@ -98,8 +116,13 @@ export function Navbar() {
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="h-9 w-9 cursor-pointer ring-2 ring-violet-500/30 transition-all hover:ring-violet-500/60"
                 >
-                  <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8b5cf6&color=fff`} />
-                  <AvatarFallback className="bg-violet-600 text-white">{getInitials(userName)}</AvatarFallback>
+                  {userAvatar ? (
+                    <AvatarImage src={userAvatar} alt="Mi perfil" className="object-cover" />
+                  ) : (
+                    <AvatarFallback className="bg-violet-600 text-white text-xs">
+                      {getInitials(userName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
 
                 {/* El Menú Flotante */}

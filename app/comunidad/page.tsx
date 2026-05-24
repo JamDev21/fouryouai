@@ -178,36 +178,46 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
 
   // Cargar usuarios y respuestas en tiempo real
   useEffect(() => {
-    const cargarDatos = async () => {
-      const usuariosSnap = await getDocs(collection(db, "usuarios"))
-      const mapa: Record<string, any> = {}
-      usuariosSnap.forEach(d => {
-        const data = d.data()
-        mapa[d.id] = { nombre: data.nombre, avatar: data.fotoPerfil || data.avatar }
-        if(data.nombre) mapa[data.nombre] = { nombre: data.nombre, avatar: data.fotoPerfil || data.avatar }
-      })
-      setMapaUsuarios(mapa)
+    // 1. Descargamos las fotos de perfil actuales
+    const cargarUsuarios = async () => {
+      try {
+        const snap = await getDocs(collection(db, "usuarios"));
+        const mapa: Record<string, any> = {};
+        snap.forEach(doc => {
+          const data = doc.data();
+          mapa[doc.id] = { 
+            nombre: data.nombre || "Usuario", 
+            avatar: data.fotoPerfil || data.avatar || "" 
+          };
+        });
+        setMapaUsuarios(mapa);
+      } catch (error) {
+        console.error("Error al cargar usuarios:", error);
+      }
+    };
+    
+    cargarUsuarios();
 
-      const q = query(
-        collection(db, "foros_respuestas"), 
-        where("id_hilo", "==", hilo.id),
-        orderBy("fechaCreacion", "asc")
-      )
+    // 2. Escuchamos solo las respuestas de ESTE hilo en tiempo real
+    const qRespuestas = query(
+      collection(db, "foros_respuestas"),
+      where("id_hilo", "==", hilo.id),
+      orderBy("fechaCreacion", "asc")
+    );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const lista = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Respuesta[]
-        setRespuestas(lista)
-      })
+    const unsubscribe = onSnapshot(qRespuestas, (snapshot) => {
+      const listaRespuestas = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Respuesta[];
+      
+      setRespuestas(listaRespuestas);
+    });
 
-      return () => unsubscribe()
-    }
-    cargarDatos()
-  }, [hilo.id])
+    return () => unsubscribe();
+  }, [hilo.id]);
 
-  // 🟢 FUNCIÓN ACTUALIZADA: Manejador para publicar respuestas y detectar menciones
+  //  FUNCIÓN ACTUALIZADA: Manejador para publicar respuestas y detectar menciones
   const handleResponder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevaRespuesta.trim()) return;
@@ -496,18 +506,22 @@ export default function ComunidadFeed() {
 
   useEffect(() => {
     const cargarHilos = async () => {
-      setLoading(true)
+      setLoading(true); 
       try {
-        const usuariosSnapshot = await getDocs(collection(db, "usuarios"))
-        const mapaUsuarios: Record<string, { nombre: string; avatar?: string }> = {}
+        // 1. Cargamos a todos los usuarios para obtener sus fotos de perfil MÁS RECIENTES
+        const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
+        const mapaUsuarios: Record<string, { nombre: string; avatar?: string }> = {};
         
         usuariosSnapshot.forEach((doc) => {
-          const data = doc.data()
-          mapaUsuarios[doc.id] = { nombre: data.nombre || "Usuario Desconocido", avatar: data.fotoPerfil || data.avatar || "" }
-          if (data.nombre) mapaUsuarios[data.nombre] = { nombre: data.nombre, avatar: data.fotoPerfil || data.avatar || "" }
-        })
+          const data = doc.data();
+          mapaUsuarios[doc.id] = { 
+            nombre: data.nombre || "Usuario Desconocido", 
+            avatar: data.fotoPerfil || data.avatar || "" 
+          };
+        });
 
-        const hilosRef = collection(db, "foros_hilos")
+        // 2. Cargamos la colección de hilos según el filtro
+        const hilosRef = collection(db, "foros_hilos");
         let q;
 
         if (filtroActivo === "recientes") {
@@ -518,35 +532,36 @@ export default function ComunidadFeed() {
           q = query(hilosRef, where("contadorRespuestas", "==", 0), orderBy("fechaCreacion", "desc"), limit(20));
         }
 
-        const snapshot = await getDocs(q!)
+        const snapshot = await getDocs(q!);
         
+        // 3. Cruzamos los hilos con la foto actual del usuario
         const listaHilos = snapshot.docs.map(doc => {
-          const data = doc.data()
-          const infoAutor = mapaUsuarios[data.id_autor] || { nombre: data.id_autor, avatar: "" }
+          const data = doc.data();
+          const infoAutor = mapaUsuarios[data.id_autor] || { nombre: data.id_autor, avatar: "" };
 
           return {
             id: doc.id,
             titulo: data.titulo || "Sin título",
             descripcion: data.descripcion || "",
             id_autor: data.id_autor || "",
-            autorNombreResolvido: infoAutor.nombre,
-            autorAvatarResolvido: infoAutor.avatar,
+            autorNombreResolvido: infoAutor.nombre,       
+            autorAvatarResolvido: infoAutor.avatar,       
             tags: data.tags || [],
             fechaCreacion: data.fechaCreacion,
             contadorRespuestas: data.contadorRespuestas || 0
-          }
-        }) as Hilo[]
+          };
+        }) as Hilo[];
 
-        setHilos(listaHilos)
+        setHilos(listaHilos);
       } catch (error) {
-        console.error("Error al cargar hilos:", error)
+        console.error("Error al cargar hilos:", error);
       } finally {
-        setLoading(false)
+        setLoading(false); 
       }
-    }
+    };
 
-    cargarHilos()
-  }, [filtroActivo, refreshTrigger]) // 🟢 re-ejecuta cuando refreshTrigger cambia
+    cargarHilos();
+  }, [filtroActivo, refreshTrigger]);
 
   const formatearFecha = (timestamp: any) => {
     if (!timestamp) return ""

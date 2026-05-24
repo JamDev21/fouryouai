@@ -18,6 +18,7 @@ const CATEGORIAS = [
 export default function ExplorarPage() {
   const searchParams = useSearchParams();
   const filtroTipo = searchParams.get("tipo"); 
+  const tagFiltro = searchParams.get("etiqueta");
   const [contenidos, setContenidos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +26,7 @@ export default function ExplorarPage() {
     const cargarRecursos = async () => {
       setLoading(true);
       try {
-        // 1. Obtener intereses del usuario para el motor de IA
+        // 1. Obtener intereses del usuario
         let misIntereses: Record<string, number> = {};
         const miUid = auth.currentUser?.uid;
         if (miUid) {
@@ -33,11 +34,14 @@ export default function ExplorarPage() {
           misIntereses = userDoc.data()?.vectorIntereses || {};
         }
 
-        // 2. Query dinámica
+        // 2. Query dinámica (AQUÍ CORREGIMOS LA LÓGICA)
         const baseQuery = collection(db, "contenidos");
         let q;
 
-        if (filtroTipo) {
+        if (tagFiltro) {
+          // Buscamos recursos que tengan ese tag en su array
+          q = query(baseQuery, where("etiquetas", "array-contains", tagFiltro), orderBy("fechaCreacion", "desc"));
+        } else if (filtroTipo) {
           q = query(baseQuery, where("tipo", "==", filtroTipo), orderBy("fechaCreacion", "desc"));
         } else {
           q = query(baseQuery, where("tipo", "in", ["curso", "podcast", "paper", "proyecto"]), orderBy("fechaCreacion", "desc"));
@@ -45,7 +49,7 @@ export default function ExplorarPage() {
 
         const snapshot = await getDocs(q);
         
-        // 3. Motor de Recomendación (Cálculo de Score)
+        // 3. Motor de Recomendación
         const data = snapshot.docs.map(doc => {
           const docData = doc.data();
           const etiquetas = docData.etiquetas || [];
@@ -58,9 +62,7 @@ export default function ExplorarPage() {
           return { id: doc.id, ...docData, score };
         });
 
-        // 4. Ordenar por relevancia (IA)
         data.sort((a, b) => b.score - a.score);
-
         setContenidos(data);
       } catch (e) {
         console.error("Error al explorar:", e);
@@ -69,16 +71,17 @@ export default function ExplorarPage() {
       }
     };
     
-    //  Dependencia correcta: si cambia el filtroTipo, se recarga la IA
     cargarRecursos();
-  }, [filtroTipo]); 
+  }, [filtroTipo, tagFiltro]);  
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-gray-200">
       <Navbar />
       
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <h1 className="text-4xl font-extrabold text-white mb-2">Explorar Recursos</h1>
+        <h1 className="text-4xl font-extrabold text-white mb-2">
+          {tagFiltro ? `Explorando #${tagFiltro}` : "Explorar Recursos"}
+        </h1>
         <p className="text-gray-400 mb-10">
           {filtroTipo ? `Resultados para: ${filtroTipo}` : "Material de estudio profundo y proyectos destacados."}
         </p>

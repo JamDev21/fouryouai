@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-// 🟢 Agregamos 'Sparkles' para el ícono de la IA
+import { useState, useEffect, Suspense  } from "react"
+//  Agregamos 'Sparkles' para el ícono de la IA
 import { Clock, TrendingUp, MessageCircleQuestion, Plus, MessageSquare, X, Sparkles } from "lucide-react"
 import { collection, getDocs, query, orderBy, where, limit, addDoc, serverTimestamp, onSnapshot, increment, updateDoc, doc, arrayUnion, arrayRemove} from "firebase/firestore"
 import { db, auth } from "@/src/lib/firebaseConfig" 
@@ -21,7 +21,7 @@ interface Hilo {
   tags: string[];
   fechaCreacion: any;
   contadorRespuestas: number;
-  score?: number; // 🟢 Propiedad para guardar el puntaje de similitud
+  score?: number; //  Propiedad para guardar el puntaje de similitud
 }
 
 interface NuevoHiloModalProps {
@@ -448,8 +448,8 @@ function HiloDetalleModal({ hilo, onClose }: HiloDetalleModalProps) {
   )
 }
 
-export default function ComunidadFeed() {
-  // 🟢 Agregamos "para-ti" al estado inicial
+function ComunidadFeedContent() {
+  // Agregamos "para-ti" al estado inicial
   const [filtroActivo, setFiltroActivo] = useState<"para-ti" | "recientes" | "populares" | "sin-responder">("para-ti")
   const [hilos, setHilos] = useState<Hilo[]>([])
   const [loading, setLoading] = useState(true)
@@ -474,7 +474,7 @@ export default function ComunidadFeed() {
       setLoading(true); 
       try {
         const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
-        // 🟢 Añadimos vectorIntereses al mapeo
+        //  Añadimos vectorIntereses al mapeo
         const mapaUsuarios: Record<string, { nombre: string; avatar?: string; vectorIntereses?: Record<string, number> }> = {};
         
         usuariosSnapshot.forEach((doc) => {
@@ -492,7 +492,7 @@ export default function ComunidadFeed() {
         const hilosRef = collection(db, "foros_hilos");
         let q;
 
-        // 🟢 Lógica de los queries adaptada
+        //  Lógica de los queries adaptada
         if (filtroActivo === "recientes") {
           q = query(hilosRef, orderBy("fechaCreacion", "desc"), limit(20));
         } else if (filtroActivo === "populares") {
@@ -511,7 +511,7 @@ export default function ComunidadFeed() {
           const infoAutor = mapaUsuarios[data.id_autor] || { nombre: data.id_autor, avatar: "" };
           const tagsDelHilo = data.tags || [];
 
-          // 🟢 Motor Matemático de Similitud
+          //  Motor Matemático de Similitud
           let score = 0;
           if (filtroActivo === "para-ti" && Object.keys(misIntereses).length > 0) {
             tagsDelHilo.forEach((tag: string) => {
@@ -535,7 +535,7 @@ export default function ComunidadFeed() {
           };
         }) as Hilo[];
 
-        // 🟢 Ordenamiento del filtro "Para ti"
+        // Ordenamiento del filtro "Para ti"
         if (filtroActivo === "para-ti") {
           listaHilos.sort((a, b) => (b.score || 0) - (a.score || 0));
         }
@@ -557,6 +557,8 @@ export default function ComunidadFeed() {
     return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
   }
 
+
+  
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6">
       
@@ -574,7 +576,7 @@ export default function ComunidadFeed() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-white/5 pb-4">
-        {/* 🟢 Agregamos el botón "Para ti" con su estilo visual */}
+        {/*  Agregamos el botón "Para ti" con su estilo visual */}
         <Button onClick={() => setFiltroActivo("para-ti")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "para-ti" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><Sparkles size={14} /> Para ti</Button>
         <Button onClick={() => setFiltroActivo("recientes")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "recientes" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><Clock size={14} /> Recientes</Button>
         <Button onClick={() => setFiltroActivo("populares")} variant="outline" className={`rounded-full border-white/10 gap-2 ${filtroActivo === "populares" ? "bg-purple-900/30 text-purple-400 border-purple-500/30" : "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}><TrendingUp size={14} /> Populares</Button>
@@ -639,5 +641,17 @@ export default function ComunidadFeed() {
         />
       )}
     </div>
+  )
+}
+
+export default function ComunidadFeed() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      </div>
+    }>
+      <ComunidadFeedContent />
+    </Suspense>
   )
 }
